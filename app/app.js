@@ -166,36 +166,34 @@ function getDinnerEmployeeRows(){
 function clearDinnerRoomForm(){
   if($("dinnerRoomName"))$("dinnerRoomName").value="";
   if($("dinnerRoomDate"))$("dinnerRoomDate").value=dinnerToday();
-  if($("dinnerEmployeeSearch"))$("dinnerEmployeeSearch").value="";
-  state.selectedDinnerEmployeeIds=[];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
+  state.selectedDinnerEmployeeIds=[];state.dinnerSelectedDepartment="";renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
 }
 function renderDinnerEmployeePicker(){
-  const teamBox=$("dinnerDepartmentPicker"), box=$("dinnerEmployeePicker");if(!box)return;
-  const all=getDinnerEmployeeRows();
-  const q=normalizeDinnerName($("dinnerEmployeeSearch")?.value||"");
+  const teamBox=$("dinnerDepartmentPicker"),box=$("dinnerEmployeePicker");if(!box)return;
   const grouped=new Map();
-  all.forEach(emp=>{
+  getDinnerEmployeeRows().forEach(emp=>{
     const department=String(emp.department||"미지정 부서").trim()||"미지정 부서";
     const team=String(emp.team||department||"미지정 팀").trim()||"미지정 팀";
     const key=`${department}||${team}`;
-    if(!grouped.has(key))grouped.set(key,{department,team,employees:[]});
-    if(!q||normalizeDinnerName(emp.name).includes(q)||normalizeDinnerName(team).includes(q)||normalizeDinnerName(department).includes(q))grouped.get(key).employees.push(emp);
+    if(!grouped.has(key))grouped.set(key,{key,department,team,employees:[]});
+    grouped.get(key).employees.push(emp);
   });
-  const groups=[...grouped.values()].filter(g=>g.employees.length).sort((a,b)=>`${a.department}${a.team}`.localeCompare(`${b.department}${b.team}`,"ko"));
-  if(teamBox){
-    teamBox.innerHTML=groups.length?groups.map((g,i)=>`<button type="button" class="btn small ${i===0?'primary':''}" data-dinner-group="${escapeHtml(`${g.department}||${g.team}`)}">${escapeHtml(g.department)} · ${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join(""):`<span class="muted-text">부서·팀 정보를 불러오지 못했습니다.</span>`;
-    teamBox.querySelectorAll('[data-dinner-group]').forEach(btn=>btn.addEventListener('click',()=>{
-      const target=document.querySelector(`[data-dinner-employee-group="${CSS.escape(btn.dataset.dinnerGroup)}"]`);
-      target?.scrollIntoView({behavior:'smooth',block:'nearest'});
-      teamBox.querySelectorAll('[data-dinner-group]').forEach(x=>x.classList.toggle('primary',x===btn));
-    }));
+  const groups=[...grouped.values()].sort((a,b)=>`${a.department}${a.team}`.localeCompare(`${b.department}${b.team}`,"ko"));
+  if(!groups.length){
+    if(teamBox)teamBox.innerHTML='<span class="muted-text">등록된 팀이 없습니다.</span>';
+    box.innerHTML='<span class="muted-text">표시할 직원이 없습니다.</span>';
+    return;
   }
-  box.innerHTML=groups.length?groups.map(g=>{
-    const key=`${g.department}||${g.team}`;
-    return `<section class="dinner-employee-group" data-dinner-employee-group="${escapeHtml(key)}"><h4>${escapeHtml(g.department)} <span>· ${escapeHtml(g.team)}</span></h4><div class="dinner-employee-group-list">${g.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
-  }).join(""):`<span class="muted-text">표시할 직원이 없습니다. 직원관리에서 부서·팀 정보를 확인하세요.</span>`;
+  if(!groups.some(g=>g.key===state.dinnerSelectedDepartment))state.dinnerSelectedDepartment=groups[0].key;
+  if(teamBox){
+    teamBox.innerHTML=groups.map(g=>`<button type="button" class="btn small ${g.key===state.dinnerSelectedDepartment?'primary':''}" data-dinner-group="${escapeHtml(g.key)}">${escapeHtml(g.department)} · ${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join("");
+    teamBox.querySelectorAll('[data-dinner-group]').forEach(btn=>btn.addEventListener('click',()=>{state.dinnerSelectedDepartment=btn.dataset.dinnerGroup;renderDinnerEmployeePicker();}));
+  }
+  const selected=groups.find(g=>g.key===state.dinnerSelectedDepartment)||groups[0];
+  box.innerHTML=`<section class="dinner-employee-group"><h4>${escapeHtml(selected.department)} <span>· ${escapeHtml(selected.team)}</span></h4><div class="dinner-employee-group-list">${selected.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
   box.querySelectorAll('[data-dinner-employee]').forEach(btn=>btn.addEventListener('click',()=>{
-    const id=String(btn.dataset.dinnerEmployee);const set=new Set(state.selectedDinnerEmployeeIds.map(String));set.has(id)?set.delete(id):set.add(id);state.selectedDinnerEmployeeIds=[...set];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
+    const id=String(btn.dataset.dinnerEmployee),set=new Set(state.selectedDinnerEmployeeIds.map(String));
+    set.has(id)?set.delete(id):set.add(id);state.selectedDinnerEmployeeIds=[...set];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
   }));
 }
 function renderDinnerSelectedEmployees(){
@@ -251,15 +249,15 @@ async function deleteDinnerRoom(roomId){
   if(!confirm(`"${room.title}" 회식방을 삭제할까요? 채팅·투표·게임 결과도 함께 삭제됩니다.`))return;
   const {error}=await supabaseClient.rpc('delete_dinner_room_secure',{p_room_id:roomId});
   if(error){toast('회식방 삭제 실패: '+error.message);return;}
-  if(String(state.selectedDinnerRoomId)===String(roomId)){state.selectedDinnerRoomId=null;$("dinnerRoomWorkspace")?.classList.add('hidden');}
+  if(String(state.selectedDinnerRoomId)===String(roomId)){state.selectedDinnerRoomId=null;$("dinnerRoomWorkspace")?.classList.add('hidden');$("dinnerChatPanel")?.classList.add('hidden');}
   await loadDinnerRooms();renderDinnerRooms();toast('회식방을 삭제했습니다.');
 }
 async function selectDinnerRoom(roomId){state.selectedDinnerRoomId=roomId;renderDinnerRooms();
   const room=(state.dinnerRooms||[]).find(x=>String(x.id)===String(roomId));if(!room)return;
-  const [m,o,v]=await Promise.all([supabaseClient.from('dinner_room_members').select('*').eq('room_id',roomId).order('member_name'),supabaseClient.from('dinner_menu_options').select('*').eq('room_id',roomId).order('created_at'),supabaseClient.from('dinner_menu_votes').select('*').eq('room_id',roomId)]);
-  state.dinnerRoomMembers=m.data||[];state.dinnerMenuOptions=o.data||[];state.dinnerMenuVotes=v.data||[];
-  $("dinnerRoomWorkspace")?.classList.remove('hidden');if($("dinnerWorkspaceTitle"))$("dinnerWorkspaceTitle").textContent=room.title;if($("dinnerWorkspaceMeta"))$("dinnerWorkspaceMeta").textContent=`${room.dinner_date||''} · 참여 ${state.dinnerRoomMembers.length}명`;
-  renderDinnerWorkspace();activateDinnerTab('members');
+  const [m,o,v,c]=await Promise.all([supabaseClient.from('dinner_room_members').select('*').eq('room_id',roomId).order('member_name'),supabaseClient.from('dinner_menu_options').select('*').eq('room_id',roomId).order('created_at'),supabaseClient.from('dinner_menu_votes').select('*').eq('room_id',roomId),supabaseClient.from('dinner_room_messages').select('*').eq('room_id',roomId).order('created_at')]);
+  state.dinnerRoomMembers=m.data||[];state.dinnerMenuOptions=o.data||[];state.dinnerMenuVotes=v.data||[];state.dinnerRoomMessages=c.data||[];
+  $("dinnerRoomWorkspace")?.classList.remove('hidden');$("dinnerChatPanel")?.classList.remove('hidden');if($("dinnerWorkspaceTitle"))$("dinnerWorkspaceTitle").textContent=room.title;if($("dinnerWorkspaceMeta"))$("dinnerWorkspaceMeta").textContent=`${room.dinner_date||''} · 참여 ${state.dinnerRoomMembers.length}명`;if($("dinnerChatTitle"))$("dinnerChatTitle").textContent=`${room.title} 채팅`;
+  renderDinnerWorkspace();renderDinnerChat();setupDinnerChatRealtime(roomId);activateDinnerTab('members');
 }
 function renderDinnerWorkspace(){
   const members=$("dinnerRoomMembers");if(members)members.innerHTML=(state.dinnerRoomMembers||[]).map(x=>`<span class="dinner-member-card">${escapeHtml(x.member_name||'직원')}</span>`).join('');
@@ -284,7 +282,7 @@ function renderDinnerChat(){
 async function sendDinnerChat(){const text=($("dinnerChatInput")?.value||'').trim();if(!state.selectedDinnerRoomId||!text)return;const {error}=await supabaseClient.from('dinner_room_messages').insert({room_id:state.selectedDinnerRoomId,sender_id:state.user.id,sender_name:state.profile?.name||'직원',message_text:text});if(error){toast('채팅 전송 실패: '+error.message);return;}$("dinnerChatInput").value='';}
 function setupDinnerChatRealtime(roomId){if(state.dinnerChatChannel)supabaseClient.removeChannel(state.dinnerChatChannel);state.dinnerChatChannel=supabaseClient.channel('dinner-chat-'+roomId).on('postgres_changes',{event:'INSERT',schema:'public',table:'dinner_room_messages',filter:`room_id=eq.${roomId}`},payload=>{state.dinnerRoomMessages.push(payload.new);renderDinnerChat();}).subscribe();}
 async function openDinnerRoomFromAlert(roomId){try{window.focus();}catch(_){}goPage('dinner');await loadDinnerRooms();renderDinnerRooms();setTimeout(()=>selectDinnerRoom(roomId),150);}
-function showDinnerRoomNotification(room){if(!('Notification' in window)||Notification.permission!=='granted')return;setTimeout(()=>{const n=new Notification('서린 물류 포털 · 새 회식방',{body:`${room.title||'회식방'}에 초대되었습니다. 클릭해서 비밀번호를 입력하고 입장하세요.`,icon:'../build/icon.png',requireInteraction:true});n.onclick=()=>{n.close();openDinnerRoomFromAlert(room.id);};},4000);}
+function showDinnerRoomNotification(room){if(!('Notification' in window)||Notification.permission!=='granted')return;setTimeout(()=>{const n=new Notification('서린 물류 포털 · 새 회식방',{body:`${room.title||'회식방'}에 초대되었습니다. 클릭하면 바로 입장합니다.`,icon:'../build/icon.png',requireInteraction:true});n.onclick=()=>{n.close();openDinnerRoomFromAlert(room.id);};},4000);}
 function setupDinnerRoomRealtime(){if(state.dinnerAlertChannel)supabaseClient.removeChannel(state.dinnerAlertChannel);state.dinnerAlertChannel=supabaseClient.channel('dinner-invite-'+state.user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'dinner_room_members',filter:`user_id=eq.${state.user.id}`},async payload=>{const {data}=await supabaseClient.from('dinner_rooms').select('id,title,dinner_date').eq('id',payload.new.room_id).single();await loadDinnerRooms();renderDinnerRooms();if(data)showDinnerRoomNotification(data);}).subscribe();}
 
 window.createDinnerRoom=createDinnerRoom;
@@ -3612,7 +3610,7 @@ bindChange("tripVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicl
 document.querySelectorAll(".vehicle-tab").forEach(b=>b.onclick=()=>activateVehicleTab(b.dataset.vtab));
 bindClick("assetManageBtn",openAssetManagement);
 bindClick("createDinnerRoomBtn",createDinnerRoom);bindClick("clearDinnerRoomBtn",clearDinnerRoomForm);bindClick("refreshDinnerRoomsBtn",async()=>{await loadDinnerRooms();renderDinnerRooms();toast("회식방을 새로고침했습니다.")});
-bindClick("addDinnerMenuBtn",addDinnerMenu);bindClick("runDinnerLadderBtn",runDinnerLadderRoom);bindClick("runDinnerRouletteBtn",runDinnerRouletteRoom);bindClick("runDinnerTeamsBtn",runDinnerTeamsRoom);bindClick("runDinnerSeatsBtn",runDinnerSeatsRoom);bindClick("runDinnerPenaltyBtn",runDinnerPenaltyRoom);bindClick("sendDinnerChatBtn",sendDinnerChat);bindChange("dinnerEmployeeSearch",renderDinnerEmployeePicker);document.querySelectorAll(".dinner-tab").forEach(b=>b.addEventListener("click",()=>activateDinnerTab(b.dataset.dtab)));if($("dinnerRoomDate"))$("dinnerRoomDate").value=dinnerToday();if($("dinnerChatInput"))$("dinnerChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendDinnerChat();}});renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
+bindClick("addDinnerMenuBtn",addDinnerMenu);bindClick("runDinnerLadderBtn",runDinnerLadderRoom);bindClick("runDinnerRouletteBtn",runDinnerRouletteRoom);bindClick("runDinnerTeamsBtn",runDinnerTeamsRoom);bindClick("runDinnerSeatsBtn",runDinnerSeatsRoom);bindClick("runDinnerPenaltyBtn",runDinnerPenaltyRoom);bindClick("sendDinnerChatBtn",sendDinnerChat);document.querySelectorAll(".dinner-tab").forEach(b=>b.addEventListener("click",()=>activateDinnerTab(b.dataset.dtab)));if($("dinnerRoomDate"))$("dinnerRoomDate").value=dinnerToday();if($("dinnerChatInput"))$("dinnerChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendDinnerChat();}});renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
 
 $("changePasswordBtn").onclick=changePassword;
 
