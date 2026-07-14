@@ -731,7 +731,7 @@
             <label>도착 주행거리<input id="tripEndOdometer" type="number" min="0" step="0.1" oninput="calcTripDistance()" /></label>
             <label>운행거리<input id="tripDistance" type="number" min="0" step="0.1" /></label>
             <label>주유비<input id="tripFuelCost" type="number" min="0" /></label>
-            <label>통행료<input id="tripTollCost" type="number" min="0" /></label>
+            
             <label class="span-2">운행 목적<input id="tripPurpose" /></label>
             <label class="span-2">비고<input id="tripMemo" /></label>
           </div>
@@ -803,7 +803,9 @@
               <label class="span-2">참여 직원 이름<textarea id="dinnerSecretMembers" placeholder="곽규탁, 엄수현, 김헌정
 이름은 쉼표 또는 줄바꿈으로 구분하세요."></textarea></label>
             </div>
-            <div id="dinnerSecretMemberResult" class="muted-text">직원 이름을 입력한 뒤 비밀방 만들기를 누르세요.</div>
+            <div class="inline-actions"><button id="showDinnerEmployeesBtn" type="button" class="btn">직원 이름 불러오기</button></div>
+            <div id="dinnerSecretEmployeeList" class="dinner-employee-list"></div>
+            <div id="dinnerSecretMemberResult" class="muted-text">직원 이름 버튼을 눌러 선택하거나 직접 입력하세요.</div>
             <div class="actions"><button class="btn primary" onclick="createDinnerSecretRoom()">비밀방 만들기</button></div>
           </article>
         </div>

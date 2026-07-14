@@ -147,10 +147,19 @@ async function createDinnerSecretRoom(){
   const roomName=($("dinnerSecretRoomName")?.value||"").trim()||"회식 비밀방";
   const raw=($("dinnerSecretMembers")?.value||"").split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
   if(!raw.length){toast("참여 직원 이름을 입력하세요.");return;}
-  const employees=(state.employees||[]).filter(e=>e.id&&e.id!==state.user?.id&&e.is_active!==false);
+  if(!(state.employees||[]).length) await loadEmployees();
+  if(!(state.employeeRegistry||[]).length) await loadEmployeeRegistry();
+  const profileRows=(state.employees||[]).filter(e=>e.id&&e.id!==state.user?.id&&e.is_active!==false);
+  const registryRows=(state.employeeRegistry||[]).filter(e=>e.is_active!==false);
+  const registryByEmpNo=new Map(registryRows.map(e=>[String(e.emp_no||""),e]));
+  const employees=profileRows.map(e=>({
+    ...e,
+    name:e.name||registryByEmpNo.get(String(e.emp_no||""))?.name||""
+  })).filter(e=>e.name);
   const memberIds=[];const found=[];const missing=[];const duplicated=[];
   for(const name of raw){
-    const matches=employees.filter(e=>String(e.name||"").trim()===name);
+    const key=name.replace(/\s+/g,"");
+    const matches=employees.filter(e=>String(e.name||"").trim().replace(/\s+/g,"")===key);
     if(matches.length===1){
       if(!memberIds.includes(matches[0].id)){memberIds.push(matches[0].id);found.push(name);}
     }else if(matches.length>1){duplicated.push(name);}else{missing.push(name);}
@@ -180,6 +189,21 @@ async function createDinnerSecretRoom(){
   toast("선택한 직원만 참여하는 회식 비밀방을 만들었습니다.");
 }
 window.createDinnerSecretRoom=createDinnerSecretRoom;
+
+async function showDinnerEmployeeNames(){
+  if(!(state.employees||[]).length) await loadEmployees();
+  const names=(state.employees||[]).filter(e=>e.id&&e.id!==state.user?.id&&e.is_active!==false).map(e=>e.name).filter(Boolean);
+  const box=$("dinnerSecretEmployeeList");
+  if(!box)return;
+  box.innerHTML=names.length?names.map(n=>`<button type="button" class="btn small dinner-employee-chip" data-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join(""):`<span class="muted-text">직원 명부를 불러오지 못했습니다. 직원관리에서 재직 직원 정보를 확인하세요.</span>`;
+  box.querySelectorAll("[data-name]").forEach(btn=>btn.addEventListener("click",()=>{
+    const input=$("dinnerSecretMembers"); if(!input)return;
+    const current=input.value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+    if(!current.includes(btn.dataset.name))current.push(btn.dataset.name);
+    input.value=current.join(", ");
+  }));
+}
+window.showDinnerEmployeeNames=showDinnerEmployeeNames;
 
 
 window.goPage = goPage; window.toggle = toggle;
@@ -3102,7 +3126,7 @@ async function completeVehicleInspection(){const vehicleId=$("inspectionVehicle"
 function clearVehicleTrip(){
   state.editingTripId=null;
   ["tripDepartment","tripDriver","tripStartPlace","tripEndPlace","tripPurpose","tripMemo"].forEach(id=>$(id).value="");
-  ["tripStartOdometer","tripEndOdometer","tripDistance","tripFuelCost","tripTollCost"].forEach(id=>$(id).value=0);
+  ["tripStartOdometer","tripEndOdometer","tripDistance","tripFuelCost"].forEach(id=>{if($(id))$(id).value=0});
   $("tripDate").value=isoDateOffset(0);
 }
 function calcTripDistance(){
@@ -3128,7 +3152,7 @@ async function saveVehicleTrip(){
     distance_km:distance,
     odometer_km:endKm,
     fuel_cost:Number($("tripFuelCost").value||0),
-    toll_cost:Number($("tripTollCost").value||0),
+    toll_cost:0,
     memo:$("tripMemo").value.trim(),
     created_by:state.user.id
   };
@@ -3150,7 +3174,7 @@ window.editVehicleTrip=id=>{
   $("tripStartPlace").value=x.start_place||"";$("tripEndPlace").value=x.end_place||"";$("tripPurpose").value=x.purpose_address||"";
   const endKm=Number(x.end_odometer_km??x.odometer_km??0);const startKm=Number(x.start_odometer_km??Math.max(0,endKm-Number(x.distance_km||0)));
   $("tripStartOdometer").value=startKm;$("tripEndOdometer").value=endKm;$("tripDistance").value=x.distance_km||Math.max(0,endKm-startKm);
-  $("tripFuelCost").value=x.fuel_cost||0;$("tripTollCost").value=x.toll_cost||0;$("tripMemo").value=x.memo||"";activateVehicleTab("trip");
+  $("tripFuelCost").value=x.fuel_cost||0;$("tripMemo").value=x.memo||"";activateVehicleTab("trip");
 }
 window.deleteVehicleTrip=async id=>{if(!confirm("이 운행일지를 삭제할까요?"))return;const {error}=await supabaseClient.from("vehicle_trip_logs").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}await loadVehicleTrips();renderVehicles();toast("운행일지를 삭제했습니다.")}
 function renderVehicleTrips(){
@@ -3160,12 +3184,12 @@ function renderVehicleTrips(){
   const rows=state.vehicleTrips.filter(x=>visibleIds.has(x.vehicle_id)&&(!state.selectedVehicleId||x.vehicle_id===state.selectedVehicleId)&&String(x.trip_date).startsWith(month));
   const canManage=has("vehicles_manage")||state.profile?.is_super_admin;
   $("vehicleTripTable").innerHTML=tableHtml(
-    ["운행일","차량","운전자","출발지","도착지","출발 주행거리","도착 주행거리","운행거리","주유비","통행료","운행 목적","비고","관리"],
+    ["운행일","차량","운전자","출발지","도착지","출발 주행거리","도착 주행거리","운행거리","주유비","운행 목적","비고","관리"],
     rows.map(x=>{
       const endKm=Number(x.end_odometer_km??x.odometer_km??0);
       const startKm=Number(x.start_odometer_km??Math.max(0,endKm-Number(x.distance_km||0)));
       const manage=(x.created_by===state.user?.id||canManage)?`<div class="table-actions"><button class="btn small" onclick="editVehicleTrip('${x.id}')">수정</button><button class="btn small danger" onclick="deleteVehicleTrip('${x.id}')">삭제</button></div>`:"-";
-      return [x.trip_date,vehicleLabel(x.vehicle_id),x.driver_name||"-",x.start_place||"-",x.end_place||"-",`${startKm.toLocaleString()}km`,`${endKm.toLocaleString()}km`,`${Number(x.distance_km||Math.max(0,endKm-startKm)).toLocaleString()}km`,money(x.fuel_cost),money(x.toll_cost),x.purpose_address||"-",x.memo||"-",manage];
+      return [x.trip_date,vehicleLabel(x.vehicle_id),x.driver_name||"-",x.start_place||"-",x.end_place||"-",`${startKm.toLocaleString()}km`,`${endKm.toLocaleString()}km`,`${Number(x.distance_km||Math.max(0,endKm-startKm)).toLocaleString()}km`,money(x.fuel_cost),x.purpose_address||"-",x.memo||"-",manage];
     })
   );
 }
@@ -3305,14 +3329,17 @@ $("saveMeetingBtn").onclick=saveMeeting;$("clearMeetingBtn").onclick=clearMeetin
 
 if($("businessTripEmployeeInput"))$("businessTripEmployeeInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addTripEmployeeName(e.target.value)}});
 $("saveBusinessTripBtn").onclick=saveBusinessTrip;$("clearBusinessTripBtn").onclick=clearBusinessTrip;$("businessTripMonth").onchange=renderBusinessTrips;
-$("saveTransportVehicleBtn").onclick=saveTransportVehicle;$("saveTransportMaintenanceBtn").onclick=saveTransportMaintenance;
-$("completeVehicleInspectionBtn").onclick=completeVehicleInspection;$("clearVehicleInspectionBtn").onclick=clearVehicleInspection;$("inspectionVehicle").onchange=e=>{state.selectedVehicleId=e.target.value;renderVehicles();};$("saveVehicleBtn").onclick=saveVehicle;$("clearVehicleBtn").onclick=clearVehicle;$("deleteVehicleBtn").onclick=deleteSelectedVehicle;
-$("saveVehicleTripBtn").onclick=saveVehicleTrip;$("clearVehicleTripBtn").onclick=clearVehicleTrip;
-$("saveVehicleMaintenanceBtn").onclick=saveVehicleMaintenance;$("clearVehicleMaintenanceBtn").onclick=clearVehicleMaintenance;$("saveForkliftBtn").onclick=saveForklift;$("clearForkliftBtn").onclick=clearForklift;$("saveForkliftMaintenanceBtn").onclick=saveForkliftMaintenance;$("clearForkliftMaintenanceBtn").onclick=clearForkliftMaintenance;
-$("exportVehicleExcelBtn").onclick=()=>exportVehicleExcel(null);$("exportSelectedVehicleExcelBtn").onclick=()=>{if(!state.selectedVehicleId){toast("차량을 먼저 선택하세요.");return}exportVehicleExcel(state.selectedVehicleId)};
-$("tripMonthFilter").onchange=renderVehicleTrips;$("maintenanceMonthFilter").onchange=renderVehicleMaintenance;
-$("tripVehicle").onchange=e=>{state.selectedVehicleId=e.target.value;renderVehicles()};$("maintenanceVehicle").onchange=e=>{state.selectedVehicleId=e.target.value;renderVehicles()};
+const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener("click",handler)};
+const bindChange=(id,handler)=>{const el=$(id);if(el)el.addEventListener("change",handler)};
+bindClick("saveTransportVehicleBtn",saveTransportVehicle);bindClick("saveTransportMaintenanceBtn",saveTransportMaintenance);
+bindClick("completeVehicleInspectionBtn",completeVehicleInspection);bindClick("clearVehicleInspectionBtn",clearVehicleInspection);bindChange("inspectionVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicles();});bindClick("saveVehicleBtn",saveVehicle);bindClick("clearVehicleBtn",clearVehicle);bindClick("deleteVehicleBtn",deleteSelectedVehicle);
+bindClick("saveVehicleTripBtn",saveVehicleTrip);bindClick("clearVehicleTripBtn",clearVehicleTrip);
+bindClick("saveVehicleMaintenanceBtn",saveVehicleMaintenance);bindClick("clearVehicleMaintenanceBtn",clearVehicleMaintenance);bindClick("saveForkliftBtn",saveForklift);bindClick("clearForkliftBtn",clearForklift);bindClick("saveForkliftMaintenanceBtn",saveForkliftMaintenance);bindClick("clearForkliftMaintenanceBtn",clearForkliftMaintenance);
+bindClick("exportVehicleExcelBtn",()=>exportVehicleExcel(null));bindClick("exportSelectedVehicleExcelBtn",()=>{if(!state.selectedVehicleId){toast("차량을 먼저 선택하세요.");return}exportVehicleExcel(state.selectedVehicleId)});
+bindChange("tripMonthFilter",renderVehicleTrips);bindChange("maintenanceMonthFilter",renderVehicleMaintenance);
+bindChange("tripVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicles()});bindChange("maintenanceVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicles()});
 document.querySelectorAll(".vehicle-tab").forEach(b=>b.onclick=()=>activateVehicleTab(b.dataset.vtab));
+bindClick("showDinnerEmployeesBtn",showDinnerEmployeeNames);
 
 $("changePasswordBtn").onclick=changePassword;
 

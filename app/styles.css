@@ -934,3 +934,5 @@ body.modal-open{overflow:hidden}
 
 /* V78 차량 운행일지 전체 조회 */
 #vehicleTripTable{overflow:auto;max-width:100%}#vehicleTripTable table{min-width:1650px}.vehicle-card-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.vehicle-card{min-height:150px}.vehicle-main-tabs{position:sticky;top:58px;z-index:3;background:#f4f7fb;padding:8px 0}
+
+.dinner-employee-list{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.dinner-employee-chip{border-radius:999px}.dinner-employee-chip:hover{transform:translateY(-1px)}
