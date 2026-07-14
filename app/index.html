@@ -820,6 +820,8 @@
             <div class="form-grid">
               <label>회식방 이름<input id="dinnerRoomName" placeholder="예: 7월 물류팀 회식" /></label>
               <label>회식 날짜<input id="dinnerRoomDate" type="date" /></label>
+              <label>방 비밀번호<input id="dinnerRoomPassword" type="password" minlength="4" placeholder="참여자가 입력할 비밀번호(4자 이상)" /></label>
+              <label>비밀번호 확인<input id="dinnerRoomPassword2" type="password" minlength="4" placeholder="비밀번호 다시 입력" /></label>
               <label class="span-2">직원 검색<input id="dinnerEmployeeSearch" placeholder="이름을 입력하세요" /></label>
             </div>
             <div id="dinnerEmployeePicker" class="dinner-employee-list"></div>
@@ -833,7 +835,8 @@
           </article>
 
           <article id="dinnerRoomWorkspace" class="panel span-2 hidden">
-            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><button id="openDinnerChatBtn" class="btn">회식방 채팅 열기</button></div>
+            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><span class="badge">비밀번호 확인 후 입장</span></div>
+            <div class="dinner-workspace-grid"><div class="dinner-game-side">
             <div class="dinner-tabs">
               <button class="btn primary dinner-tab" data-dtab="members">참여 직원</button>
               <button class="btn dinner-tab" data-dtab="menu">메뉴 선택</button>
@@ -883,6 +886,12 @@
               <div class="actions"><button id="runDinnerPenaltyBtn" class="btn primary">벌칙 뽑기</button></div>
               <div id="dinnerPenaltyOutput" class="game-result">결과가 여기에 표시됩니다.</div>
             </div>
+            </div>
+            <aside class="dinner-chat-side">
+              <div class="panel-head compact-head"><div><h4>회식방 채팅</h4><small>방에 참여한 직원끼리 바로 대화합니다.</small></div></div>
+              <div id="dinnerChatMessages" class="dinner-chat-messages"><div class="empty">대화가 없습니다.</div></div>
+              <div class="dinner-chat-compose"><textarea id="dinnerChatInput" placeholder="메시지를 입력하세요. Enter 전송 / Shift+Enter 줄바꿈"></textarea><button id="sendDinnerChatBtn" class="btn primary">전송</button></div>
+            </aside></div>
           </article>
         </div>
       </section>
