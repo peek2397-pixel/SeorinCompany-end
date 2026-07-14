@@ -64,6 +64,10 @@
 
         </div>
 
+        <article class="panel dashboard-leave-panel">
+          <div class="panel-head"><div><h3>오늘 연차·반차 현황</h3><small>오늘 휴가 중인 직원 이름과 인원을 표시합니다.</small></div></div>
+          <div id="dashboardLeaveToday" class="dashboard-leave-today"></div>
+        </article>
 
         <div class="content-grid">
           <article class="panel span-2">
@@ -644,8 +648,21 @@
 
       <section id="transportPage" class="page"></section>
 
-      <section id="vehiclesPage" class="page"><div class="asset-tabs"><button class="btn" data-asset-tab="transport" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn primary" data-asset-tab="company" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" data-asset-tab="forklift" onclick="switchAssetTab('forklift')">지게차</button><button id="assetManageBtn" class="btn" data-asset-tab="manage" onclick="openAssetManagement()">관리</button></div>
-        <div class="panel vehicle-top-panel">
+      <section id="vehiclesPage" class="page"><div class="asset-tabs"><button class="btn" data-asset-tab="transport" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn primary" data-asset-tab="company" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" data-asset-tab="forklift" onclick="switchAssetTab('forklift')">지게차</button><button id="assetManageBtn" class="btn" data-asset-tab="manage" type="button">관리</button></div>
+
+        <section id="assetAdminHub" class="panel hidden">
+          <div class="panel-head">
+            <div><h3>차량·장비 관리자 메뉴</h3><small>관리자만 등록·수정·삭제할 수 있습니다. 관리할 항목을 선택하세요.</small></div>
+            <button class="btn" type="button" onclick="exitAssetManagement()">조회 화면으로</button>
+          </div>
+          <div class="admin-choice-grid">
+            <button class="admin-choice-card" type="button" onclick="openVehicleAdminSection('transport')"><b>운송팀 차량</b><span>5톤·3.5톤·1톤 차량 등록·수정·삭제</span></button>
+            <button class="admin-choice-card" type="button" onclick="openVehicleAdminSection('company')"><b>일반 차량</b><span>회사 일반 차량 등록·수정·삭제</span></button>
+            <button class="admin-choice-card" type="button" onclick="openForkliftAdminFromHub()"><b>지게차</b><span>종합물류·3물류 지게차 등록·수정·삭제</span></button>
+            <button class="admin-choice-card danger-card" type="button" onclick="clearTestOperationalData()"><b>테스트 입력자료 전체 삭제</b><span>회식방·출장·운행/정비·검사·구매·일정 테스트 자료 삭제</span></button>
+          </div>
+        </section>
+        <div id="vehicleBrowsePanel" class="panel vehicle-top-panel">
           <div class="panel-head">
             <div>
               <h3 id="vehiclePageTitle">일반 차량관리</h3>
@@ -660,7 +677,7 @@
           <div id="selectedVehicleSummary" class="selected-vehicle-summary"></div>
         </div>
 
-        <div class="vehicle-tabs vehicle-main-tabs">
+        <div id="vehicleMainTabs" class="vehicle-tabs vehicle-main-tabs">
           <button class="vehicle-tab active" data-vtab="basic">차량정보 관리</button>
           <button class="vehicle-tab" data-vtab="inspection">자동차 검사</button>
           <button class="vehicle-tab" data-vtab="trip">운행일지</button>
@@ -820,11 +837,10 @@
             <div class="form-grid">
               <label>회식방 이름<input id="dinnerRoomName" placeholder="예: 7월 물류팀 회식" /></label>
               <label>회식 날짜<input id="dinnerRoomDate" type="date" /></label>
-              <label>방 비밀번호<input id="dinnerRoomPassword" type="password" minlength="4" placeholder="참여자가 입력할 비밀번호(4자 이상)" /></label>
-              <label>비밀번호 확인<input id="dinnerRoomPassword2" type="password" minlength="4" placeholder="비밀번호 다시 입력" /></label>
-              <label class="span-2">직원 검색<input id="dinnerEmployeeSearch" placeholder="이름을 입력하세요" /></label>
+              <label class="span-2">직원 검색<input id="dinnerEmployeeSearch" placeholder="선택한 팀 안에서 이름 검색" /></label>
             </div>
-            <div id="dinnerEmployeePicker" class="dinner-employee-list"></div>
+            <div class="dinner-team-select"><b>팀 선택</b><div id="dinnerDepartmentPicker" class="dinner-department-list"></div></div>
+            <div class="dinner-team-select"><b>직원 선택</b><div id="dinnerEmployeePicker" class="dinner-employee-list"></div></div>
             <div class="selected-member-box"><b>선택 직원</b><div id="dinnerSelectedEmployees" class="dinner-selected-list">선택된 직원이 없습니다.</div></div>
             <div class="actions"><button id="createDinnerRoomBtn" class="btn primary">회식방 만들기</button><button id="clearDinnerRoomBtn" class="btn">초기화</button></div>
           </article>
@@ -835,7 +851,7 @@
           </article>
 
           <article id="dinnerRoomWorkspace" class="panel span-2 hidden">
-            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><span class="badge">비밀번호 확인 후 입장</span></div>
+            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><span class="badge">초대 직원 전용</span></div>
             <div class="dinner-workspace-grid"><div class="dinner-game-side">
             <div class="dinner-tabs">
               <button class="btn primary dinner-tab" data-dtab="members">참여 직원</button>

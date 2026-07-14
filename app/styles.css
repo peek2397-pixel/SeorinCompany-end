@@ -942,3 +942,15 @@ body.modal-open{overflow:hidden}
 
 /* V84 회식방 비밀번호·알림·내부채팅 */
 .dinner-workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:14px;align-items:start}.dinner-game-side{min-width:0}.dinner-chat-side{border-left:1px solid #e0e8f2;padding-left:14px;position:sticky;top:10px}.dinner-chat-messages{height:510px;overflow:auto;border:1px solid #dbe5f0;border-radius:10px;background:#f7faff;padding:10px;display:flex;flex-direction:column;gap:8px}.dinner-chat-row{max-width:88%;background:white;border:1px solid #dbe5f0;border-radius:10px;padding:8px 10px}.dinner-chat-row.mine{align-self:flex-end;background:#e8f2ff;border-color:#acd0ff}.dinner-chat-row>div{display:flex;justify-content:space-between;gap:10px}.dinner-chat-row small{color:#7a8797}.dinner-chat-row p{margin:5px 0 0;word-break:break-word}.dinner-chat-compose{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:8px}.dinner-chat-compose textarea{min-height:64px;resize:vertical}@media(max-width:1100px){.dinner-workspace-grid{grid-template-columns:1fr}.dinner-chat-side{border-left:0;border-top:1px solid #e0e8f2;padding-left:0;padding-top:14px;position:static}.dinner-chat-messages{height:330px}}
+
+.dinner-team-select{margin-top:10px}.dinner-department-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;padding:10px;border:1px solid #d8e3ef;border-radius:10px;background:#fff}.dinner-room-card{position:relative;grid-template-columns:1fr auto;align-items:center}.dinner-room-open{border:0;background:transparent;text-align:left;display:grid;gap:4px;cursor:pointer;padding:0}.dinner-room-delete{white-space:nowrap}.btn.danger{background:#c62828;color:#fff;border-color:#c62828}
+
+/* V90 관리자 전용 차량·장비 허브 */
+.admin-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
+.admin-choice-card{min-height:120px;padding:22px;border:1px solid #d7e1ee;border-radius:14px;background:#fff;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 14px rgba(15,42,74,.06)}
+.admin-choice-card:hover{border-color:#1677ff;box-shadow:0 7px 20px rgba(22,119,255,.13)}
+.admin-choice-card b{font-size:18px;color:#10233e}.admin-choice-card span{font-size:13px;color:#66758a}
+@media(max-width:900px){.admin-choice-grid{grid-template-columns:1fr}}
+
+/* V92 dashboard leave and admin safeguards */
+.dashboard-leave-panel{margin-top:12px}.dashboard-leave-today{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.dashboard-leave-group{border:1px solid #dbe6f4;border-radius:12px;padding:12px;background:#fff}.dashboard-leave-group>div{display:flex;justify-content:space-between;align-items:center}.dashboard-leave-group strong{font-size:20px;color:#1268e8}.dashboard-leave-group p{margin:8px 0 0;color:#475569;min-height:20px}.danger-card{border-color:#fecaca!important;background:#fff7f7!important}.danger-card b{color:#b91c1c}.dinner-room-list-panel{min-width:340px}.dinner-room-card b{font-size:15px}.dinner-employee-chip{cursor:pointer}.dinner-employee-chip.primary{box-shadow:0 0 0 2px rgba(18,104,232,.18)}@media(max-width:900px){.dashboard-leave-today{grid-template-columns:1fr}}
