@@ -920,3 +920,9 @@ body.modal-open{overflow:hidden}
 .vehicle-card{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid #cbd9ec;background:#fff;border-radius:12px;padding:14px;cursor:pointer}
 .vehicle-card.selected{border-color:#1f6feb;box-shadow:0 0 0 2px rgba(31,111,235,.15)}
 .vehicle-card span,.vehicle-card small{color:#64748b}
+
+/* V70 운송팀 차량 등록·수정 화면 */
+.transport-vehicle-editor{margin:14px 0 18px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#f8fbff}
+.transport-list-head{margin-top:4px;padding-top:14px;border-top:1px solid var(--line)}
+#transportPage .vehicle-card{cursor:pointer}
+#transportPage .vehicle-card:hover{transform:translateY(-1px);box-shadow:0 7px 18px rgba(30,60,90,.10)}

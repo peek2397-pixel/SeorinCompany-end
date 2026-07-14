@@ -650,21 +650,27 @@
       </section>
 
       <section id="transportPage" class="page">
-        <div class="panel">
-          <div class="panel-head"><div><h3>운송팀 차량관리</h3><small>5톤 2대 · 3.5톤 1대 · 1톤 1대를 실제 차량번호로 등록·수정합니다.</small></div><button class="btn" onclick="exportVehicleExcel()">전체 차량 엑셀</button></div>
+        <div class="panel vehicle-top-panel">
+          <div class="panel-head">
+            <div><h3>운송팀 차량관리</h3><small>기존 차량관리와 같은 방식으로 실제 차량번호를 등록하고 카드에서 선택해 수정합니다.</small></div>
+            <div class="actions compact-actions"><button class="btn" type="button" onclick="clearTransportVehicle()">신규 차량 등록</button><button class="btn primary" onclick="exportVehicleExcel()">전체 차량 엑셀</button></div>
+          </div>
+          <div class="transport-vehicle-editor">
+            <div class="form-grid">
+              <label>차량명<input id="transportVehicleName" value="화물차" placeholder="예: 5톤 화물차" /></label>
+              <label>차량번호<input id="transportVehicleNumber" placeholder="예: 12가3456" /></label>
+              <label>톤수<select id="transportTonnage"><option>5톤</option><option>3.5톤</option><option>1톤</option></select></label>
+              <label>담당자<input id="transportVehicleManager" value="신태선" /></label>
+              <label>현재 주행거리<input id="transportMileage" type="number" min="0" placeholder="0" /></label>
+              <label>검사 만료일<input id="transportInspection" type="date" /></label>
+              <label>상태<select id="transportStatus"><option>운행가능</option><option>정비중</option><option>사용중지</option></select></label>
+            </div>
+            <div class="actions"><button id="saveTransportVehicleBtn" class="btn primary">차량 저장</button><button class="btn" type="button" onclick="clearTransportVehicle()">입력 초기화</button></div>
+          </div>
+          <div class="panel-head transport-list-head"><h3>등록 차량</h3><small>카드를 클릭하면 위 입력란에 차량정보가 불러와져 수정할 수 있습니다.</small></div>
           <div id="transportVehicleCards" class="vehicle-card-grid"></div>
         </div>
         <div class="content-grid">
-          <article class="panel">
-            <div class="panel-head"><h3>운송팀 차량 등록·수정</h3></div>
-            <div class="form-grid">
-              <label>차량번호<input id="transportVehicleNumber" placeholder="예: 12가3456" /></label><label>톤수<select id="transportTonnage"><option>5톤</option><option>3.5톤</option><option>1톤</option></select></label>
-              <label>차량명<input id="transportVehicleName" value="화물차" /></label><label>담당자<input id="transportVehicleManager" value="신태선" /></label>
-              <label>현재 주행거리<input id="transportMileage" type="number" min="0" /></label>
-              <label>검사 만료일<input id="transportInspection" type="date" /></label>
-              <label>상태<select id="transportStatus"><option>운행가능</option><option>정비중</option><option>사용중지</option></select></label>
-            </div><div class="actions"><button id="saveTransportVehicleBtn" class="btn primary">차량 저장</button><button class="btn" type="button" onclick="clearTransportVehicle()">신규 등록</button></div>
-          </article>
           <article class="panel">
             <div class="panel-head"><div><h3>운송팀 정비·소모품 등록</h3><small>엄수현 등록 → 신태선 결재 → 손동오 최종결재 / 신태선 등록 → 손동오 최종결재</small></div></div>
             <div class="form-grid">
