@@ -160,10 +160,18 @@ function renderMenu(){
     if(m[0]==="purchase")return has("purchase_view")||has("inventory_view");
     return has(m[2]);
   });
-  $("menu").innerHTML=rows.map(([id,label])=>{
+  const menuEl=$("menu");
+  menuEl.innerHTML=rows.map(([id,label])=>{
     const target=id==="purchase"&&!has("purchase_view")&&has("inventory_view")?"inventory":id;
-    return `<button class="nav-btn" data-page="${id}" onclick="goPage('${target}')"><span>${label}</span><span class="nav-unread hidden" data-badge-for="${id}">0</span></button>`;
+    return `<button type="button" class="nav-btn" data-page="${id}" data-target-page="${target}"><span>${label}</span><span class="nav-unread hidden" data-badge-for="${id}">0</span></button>`;
   }).join("");
+  menuEl.querySelectorAll(".nav-btn").forEach(btn=>{
+    btn.addEventListener("click",event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      goPage(btn.dataset.targetPage||btn.dataset.page);
+    });
+  });
   updateMenuBadges();
 }
 function updateMenuBadges(){
@@ -177,10 +185,23 @@ function updateMenuBadges(){
 function goPage(id){
   if(id==="purchase"&&!has("purchase_view")&&has("inventory_view"))id="inventory";
   if(id==="inventory"&&!has("inventory_view")&&has("purchase_view"))id="purchase";
-  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  $(`${id}Page`)?.classList.add("active");
+  const target=$(`${id}Page`);
+  if(!target){
+    console.error("페이지를 찾을 수 없습니다:",id);
+    toast("화면을 찾을 수 없습니다: "+id);
+    return;
+  }
+  document.querySelectorAll(".page").forEach(p=>{
+    p.classList.remove("active");
+    p.style.display="none";
+  });
+  target.classList.add("active");
+  target.style.display="block";
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")||(["transport","vehicles","forklift"].includes(id)&&b.dataset.page==="transport")));
-  $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
+  $("pageTitle").textContent=pageInfo[id]?.[0]||id;
+  $("pageSub").textContent=pageInfo[id]?.[1]||"";
+  document.querySelector(".main")?.scrollTo({top:0,left:0,behavior:"auto"});
+  window.scrollTo({top:0,left:0,behavior:"auto"});
   if(id==="permissions") renderPermissions();
 }
 
