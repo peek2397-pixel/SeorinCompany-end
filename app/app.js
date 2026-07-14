@@ -1679,16 +1679,15 @@ async function finalCompletePurchase(id){
   if(!isFinalPurchaseApprover()){toast("최종관리자만 완료 처리할 수 있습니다.");return}
   const x=(state.purchaseRequests||[]).find(r=>String(r.id)===String(id));
   if(!x){toast("구매 신청을 찾을 수 없습니다.");return}
-  if(!confirm(`${x.item_name||"구매 건"}을 바로 구매완료 처리하시겠습니까?`))return;
-  const flow=["requested","reviewing","review_complete","approved","ordered","received","completed"];
-  let idx=flow.indexOf(x.status);
-  if(idx<0||x.status==="completed"){toast("완료 처리할 수 없는 상태입니다.");return}
-  for(let i=idx+1;i<flow.length;i++){
-    const {error}=await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:flow[i],p_reason:null});
-    if(error){toast(`완료 처리 실패(${purchaseStatusLabel(flow[i])}): ${error.message}`);return}
-  }
+  if(!confirm(`${x.item_name||"구매 건"}을 검토 단계를 생략하고 바로 구매완료 처리하시겠습니까?`))return;
+  const {error}=await supabaseClient.rpc("admin_direct_purchase_status",{
+    p_request_id:id,
+    p_status:"completed",
+    p_reason:"최고관리자 직접 완료 처리"
+  });
+  if(error){toast(`완료 처리 실패: ${error.message}`);return}
   await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
-  toast("손동오 최종관리자가 구매완료 처리했습니다.");
+  toast("최고관리자가 검토 단계를 생략하고 구매완료 처리했습니다.");
 }
 
 function renderPurchases(){
@@ -1718,25 +1717,36 @@ function renderPurchases(){
     <td>${escapeHtml(x.needed_date||"-")}</td>
     <td>${x.estimated_amount?money(x.estimated_amount):"-"}</td>
     <td><span class="status-badge status-${escapeHtml(x.status)}">${purchaseStatusLabel(x.status)}</span>${x.reject_reason?`<br><small class="text-danger">${escapeHtml(x.reject_reason)}</small>`:""}</td>
-    <td><small>검토: ${escapeHtml(x.reviewer_name||"-")} ${x.reviewed_at?`<br>${formatDateTime(x.reviewed_at)}`:""}<br>승인: ${escapeHtml(x.approver_name||"-")} ${x.approved_at?`<br>${formatDateTime(x.approved_at)}`:""}</small></td>
+    <td><small>${x.review_skip_reason?`검토: <b>${escapeHtml(x.review_skip_reason)}</b>`:`검토: ${escapeHtml(x.reviewer_name||"-")} ${x.reviewed_at?`<br>${formatDateTime(x.reviewed_at)}`:""}`}<br>승인: ${escapeHtml(x.approver_name||"-")} ${x.approved_at?`<br>${formatDateTime(x.approved_at)}`:""}</small></td>
     <td>${purchaseUsageText(x)}</td>
     <td><div class="inline-actions">${purchaseActions(x)}</div></td>
   </tr>`).join(""):`<tr><td colspan="11">구매 신청 내역이 없습니다.</td></tr>`}</tbody></table></div>`;
 }
 window.changePurchaseStatus=async function(id,status){
   const label=purchaseStatusLabel(status);
-  if(!confirm(`이 구매 건을 '${label}' 상태로 변경할까요?`))return;
-  const {error}=await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:status,p_reason:null});
+  const direct=isFinalPurchaseApprover() && ["approved","completed"].includes(status);
+  const msg=direct
+    ? `구매담당자 검토를 생략하고 '${label}' 처리할까요?`
+    : `이 구매 건을 '${label}' 상태로 변경할까요?`;
+  if(!confirm(msg))return;
+  const call=direct
+    ? supabaseClient.rpc("admin_direct_purchase_status",{p_request_id:id,p_status:status,p_reason:"최고관리자 직접 처리"})
+    : supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:status,p_reason:null});
+  const {error}=await call;
   if(error){toast("상태 변경 실패: "+error.message);return}
-  toast(label+" 처리되었습니다.");await loadPurchaseRequests();renderPurchases();renderDashboard();
+  toast((direct?"검토 생략 · ":"")+label+" 처리되었습니다.");
+  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
 };
 window.rejectPurchase=async function(id){
   const reason=prompt("반려 사유를 입력하세요.");
   if(reason===null)return;
   if(!reason.trim()){toast("반려 사유를 입력하세요.");return}
-  const {error}=await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:"rejected",p_reason:reason.trim()});
+  const direct=isFinalPurchaseApprover();
+  const {error}=direct
+    ? await supabaseClient.rpc("admin_direct_purchase_status",{p_request_id:id,p_status:"rejected",p_reason:reason.trim()})
+    : await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:"rejected",p_reason:reason.trim()});
   if(error){toast("반려 처리 실패: "+error.message);return}
-  toast("반려 처리되었습니다.");await loadPurchaseRequests();renderPurchases();renderDashboard();
+  toast("반려 처리되었습니다.");await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
 };
 window.completePurchaseUsage=async function(id){
   const target=(state.purchaseRequests||[]).find(x=>String(x.id)===String(id));
