@@ -661,7 +661,9 @@
               <label>차량번호<input id="transportVehicleNumber" placeholder="예: 12가3456" /></label><label>톤수<select id="transportTonnage"><option>5톤</option><option>3.5톤</option><option>1톤</option></select></label>
               <label>차량명<input id="transportVehicleName" value="화물차" /></label><label>담당자<input id="transportVehicleManager" value="신태선" /></label>
               <label>현재 주행거리<input id="transportMileage" type="number" min="0" /></label>
-            </div><div class="actions"><button id="saveTransportVehicleBtn" class="btn primary">차량 저장</button></div>
+              <label>검사 만료일<input id="transportInspection" type="date" /></label>
+              <label>상태<select id="transportStatus"><option>운행가능</option><option>정비중</option><option>사용중지</option></select></label>
+            </div><div class="actions"><button id="saveTransportVehicleBtn" class="btn primary">차량 저장</button><button class="btn" type="button" onclick="clearTransportVehicle()">신규 등록</button></div>
           </article>
           <article class="panel">
             <div class="panel-head"><div><h3>운송팀 정비·소모품 등록</h3><small>엄수현 등록 → 신태선 결재 → 손동오 최종결재 / 신태선 등록 → 손동오 최종결재</small></div></div>
@@ -696,7 +698,6 @@
           <button class="vehicle-tab active" data-vtab="basic">차량 기본정보</button>
           <button class="vehicle-tab" data-vtab="trip">운행일지</button>
           <button class="vehicle-tab" data-vtab="maintenance">차량 정비·소모품</button>
-          <button class="vehicle-tab" data-vtab="forklift">지게차 관리</button>
         </div>
 
         <section id="vehicleBasicPanel" class="vehicle-tab-panel">
@@ -762,7 +763,10 @@
           <div id="vehicleMaintenanceTable"></div>
         </section>
 
-        <section id="vehicleForkliftPanel" class="vehicle-tab-panel hidden">
+      </section>
+
+        <section id="forkliftPage" class="page">
+        <div class="panel"><div class="panel-head"><div><h3>지게차관리</h3><small>종합물류·3물류 지게차의 증류수 보충일, 가동시간, 엔진오일·타이어·부품 교환을 별도로 관리합니다.</small></div></div></div>
           <div class="content-grid">
             <article class="panel">
               <div class="panel-head"><div><h3>지게차 등록·수정</h3><small>종합물류 이형기 대리 / 3물류 구강석 대리</small></div></div>
@@ -792,7 +796,6 @@
             <div id="forkliftMaintenanceTable"></div>
           </article>
         </section>
-      </section>
 
       <section id="accountPage" class="page">
         <div class="content-grid">

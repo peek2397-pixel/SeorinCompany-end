@@ -29,6 +29,7 @@ const pageInfo = {
   trips:["출장관리","출장 등록과 차량 지정, 출장자 식사 제외를 관리합니다."],
   transport:["운송팀","운송팀 화물차와 정비 결재를 관리합니다."],
   vehicles:["차량관리","차량 기본정보, 운행일지, 정비·수리 이력을 관리합니다."],
+  forklift:["지게차관리","지게차 등록, 증류수 보충, 가동시간과 부품 교환 이력을 관리합니다."],
   account:["내 정보·비밀번호","내 정보 확인과 비밀번호 변경"],
   kpi:["KPI 관리","평가 권한자만 점수와 순위를 볼 수 있습니다."],
   employees:["직원관리","직원·부서·직급 정보를 관리합니다."],
@@ -50,6 +51,7 @@ const menus = [
   ["trips","출장관리","calendar_use"],
   ["transport","운송팀","vehicles_view"],
   ["vehicles","차량관리","vehicles_view"],
+  ["forklift","지게차관리","vehicles_view"],
   ["account","내 정보·비밀번호","account_view"],
   ["kpi","B2C KPI 관리","kpi_view"],
   ["employees","직원관리","employees_manage"],
@@ -474,8 +476,8 @@ function pendingWorkAlerts(){
     (state.vehicleMaintenance||[]).filter(x=>x.workflow_status==="final_review").forEach(x=>out.push({key:`transport:${x.id}:final`,kind:"✅ 운송팀 최종 결재",title:`${vehicleLabel(x.vehicle_id)} · ${x.maintenance_type||"정비"}`,content:`${x.reported_by_name||"담당자"} 등록 · ${money(x.cost||0)}`,page:"transport"}));
   }
   if(currentUserIs("김헌정")){
-    (state.vehicleMaintenance||[]).filter(x=>(x.workflow_status||"reported")==="reported").forEach(x=>out.push({key:`vehicle:${x.id}:amount`,kind:"🚚 차량 금액 확인",title:`${vehicleLabel(x.vehicle_id)} · ${x.maintenance_type||"정비"}`,content:`보고금액 ${money(x.cost||0)} · ${x.reported_by_name||"보고자"}`,page:"vehicles"}));
-    (state.forkliftMaintenance||[]).filter(x=>(x.workflow_status||"reported")==="reported").forEach(x=>out.push({key:`forklift:${x.id}:amount`,kind:"🏗️ 지게차 금액 확인",title:`${forkliftLabel(x.forklift_id)} · ${x.maintenance_type||"정비"}`,content:`보고금액 ${money(x.cost||0)} · ${x.reported_by_name||"보고자"}`,page:"vehicles"}));
+    (state.vehicleMaintenance||[]).filter(x=>(x.workflow_status||"reported")==="reported").forEach(x=>out.push({key:`vehicle:${x.id}:amount`,kind:"🚚 차량 금액 확인",title:`${vehicleLabel(x.vehicle_id)} · ${x.maintenance_type||"정비"}`,content:`보고금액 ${money(x.cost||0)} · ${x.reported_by_name||"보고자"}`,page:"forklift"}));
+    (state.forkliftMaintenance||[]).filter(x=>(x.workflow_status||"reported")==="reported").forEach(x=>out.push({key:`forklift:${x.id}:amount`,kind:"🏗️ 지게차 금액 확인",title:`${forkliftLabel(x.forklift_id)} · ${x.maintenance_type||"정비"}`,content:`보고금액 ${money(x.cost||0)} · ${x.reported_by_name||"보고자"}`,page:"forklift"}));
   }
   if(currentUserIs("손동오")||state.profile?.is_super_admin){
     (state.vehicleMaintenance||[]).filter(x=>x.workflow_status==="amount_checked").forEach(x=>out.push({key:`vehicle:${x.id}:approve`,kind:"✅ 차량 최종 결재",title:`${vehicleLabel(x.vehicle_id)} · ${x.maintenance_type||"정비"}`,content:`김헌정 금액확인 ${money(x.cost||0)}`,page:"vehicles"}));
@@ -1559,7 +1561,12 @@ function purchaseActions(x){
     if(["requested","reviewing","review_complete"].includes(x.status))buttons.push(`<button class="btn small danger" onclick="rejectPurchase('${x.id}')">반려</button>`);
   }
 
-  // 최고관리자는 최종승인 권한과 구매처리 권한을 동시에 가지므로 승인 이후 처리 버튼도 표시합니다.
+  // 손동오 최종관리자는 어느 단계에서든 직접 구매완료 처리할 수 있습니다.
+  if(canFinalApprove && !["completed","rejected"].includes(x.status)){
+    buttons.push(`<button class="btn small success" onclick="finalCompletePurchase('${x.id}')">완료 처리</button>`);
+  }
+
+  // 구매담당자는 기존 발주·입고·완료 흐름을 그대로 처리합니다.
   if(canManage){
     if(x.status==="approved")buttons.push(`<button class="btn small primary" onclick="changePurchaseStatus('${x.id}','ordered')">발주 완료</button>`);
     if(x.status==="ordered")buttons.push(`<button class="btn small primary" onclick="changePurchaseStatus('${x.id}','received')">입고 완료</button>`);
@@ -1570,6 +1577,22 @@ function purchaseActions(x){
 
   return buttons.join(" ")||"-";
 }
+async function finalCompletePurchase(id){
+  if(!isFinalPurchaseApprover()){toast("최종관리자만 완료 처리할 수 있습니다.");return}
+  const x=(state.purchaseRequests||[]).find(r=>String(r.id)===String(id));
+  if(!x){toast("구매 신청을 찾을 수 없습니다.");return}
+  if(!confirm(`${x.item_name||"구매 건"}을 바로 구매완료 처리하시겠습니까?`))return;
+  const flow=["requested","reviewing","review_complete","approved","ordered","received","completed"];
+  let idx=flow.indexOf(x.status);
+  if(idx<0||x.status==="completed"){toast("완료 처리할 수 없는 상태입니다.");return}
+  for(let i=idx+1;i<flow.length;i++){
+    const {error}=await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:flow[i],p_reason:null});
+    if(error){toast(`완료 처리 실패(${purchaseStatusLabel(flow[i])}): ${error.message}`);return}
+  }
+  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
+  toast("손동오 최종관리자가 구매완료 처리했습니다.");
+}
+
 function renderPurchases(){
   if(!$("purchaseTable"))return;
   const filter=$("purchaseStatusFilter")?.value||"all";
@@ -2908,13 +2931,14 @@ window.deleteBusinessTrip=async id=>{if(!confirm("이 출장을 삭제할까요?
 function renderTransport(){
   if(!$("transportVehicleCards"))return;
   const vehicles=transportVehicles();
-  $("transportVehicleCards").innerHTML=vehicles.map(v=>`<button class="vehicle-card ${state.selectedVehicleId===v.id?"selected":""}" onclick="selectTransportVehicle('${v.id}')"><b>${escapeHtml(v.vehicle_number||"차량번호 미등록")}</b><span>${escapeHtml(v.vehicle_name||"화물차")} · ${escapeHtml(v.tonnage||"")}</span><small>담당 ${escapeHtml(v.manager_name||"신태선")}</small></button>`).join("")||`<div class="empty">운송팀 차량을 등록하세요. 5톤 2대, 3.5톤 1대, 1톤 1대를 차량번호로 구분합니다.</div>`;
+  $("transportVehicleCards").innerHTML=vehicles.map(v=>`<article class="vehicle-card ${state.selectedVehicleId===v.id?"selected":""}" onclick="selectTransportVehicle('${v.id}')"><div class="vehicle-card-head"><b>${escapeHtml(v.vehicle_name||"화물차")}</b><span class="badge">${escapeHtml(v.status||"운행가능")}</span></div><strong>${escapeHtml(v.vehicle_number||"차량번호 미등록")}</strong><span>${escapeHtml(v.tonnage||"")} · 담당 ${escapeHtml(v.manager_name||"신태선")}</span><div class="vehicle-card-metrics"><span>${Number(v.current_mileage||0).toLocaleString()}km</span><span>검사 ${escapeHtml(v.inspection_expiry||"미등록")}</span></div><button class="btn small" type="button" onclick="event.stopPropagation();selectTransportVehicle('${v.id}')">수정</button></article>`).join("")||`<div class="empty">운송팀 차량을 등록하세요. 5톤 2대, 3.5톤 1대, 1톤 1대를 실제 차량번호로 구분합니다.</div>`;
   const sel=$("transportMaintenanceVehicle");if(sel){const old=sel.value;sel.innerHTML=vehicles.map(v=>`<option value="${v.id}">${escapeHtml(v.vehicle_number)} · ${escapeHtml(v.tonnage||v.vehicle_name||"")}</option>`).join("");if([...sel.options].some(o=>o.value===old))sel.value=old;}
   const rows=(state.vehicleMaintenance||[]).filter(x=>vehicles.some(v=>v.id===x.vehicle_id));
   $("transportMaintenanceTable").innerHTML=tableHtml(["정비일","차량번호","항목","주행거리","금액","상태","처리정보","관리"],rows.map(x=>[x.maintenance_date,vehicleLabel(x.vehicle_id),x.maintenance_type,`${Number(x.mileage_km||0).toLocaleString()}km`,money(x.cost),transportWorkflowLabel(x.workflow_status),`등록 ${x.reported_by_name||"-"}<br>1차 ${x.manager_approved_by_name||"-"}<br>최종 ${x.approved_by_name||"-"}`,transportMaintenanceActions(x)]));
 }
-window.selectTransportVehicle=id=>{state.selectedVehicleId=id;const v=state.vehicles.find(x=>x.id===id);if(!v)return;$("transportVehicleName").value=v.vehicle_name||"";$("transportVehicleNumber").value=v.vehicle_number||"";$("transportTonnage").value=v.tonnage||"";$("transportVehicleManager").value=v.manager_name||"신태선";$("transportMileage").value=v.current_mileage||0;renderTransport()}
-async function saveTransportVehicle(){if(!has("vehicles_manage")&&!state.profile?.is_super_admin){toast("차량 관리 권한이 필요합니다.");return}const row={vehicle_group:"transport",vehicle_name:$("transportVehicleName").value.trim()||"화물차",vehicle_number:$("transportVehicleNumber").value.trim(),tonnage:$("transportTonnage").value,manager_name:$("transportVehicleManager").value.trim()||"신태선",current_mileage:Number($("transportMileage").value||0),status:"운행가능",updated_at:new Date().toISOString()};if(!row.vehicle_number){toast("차량번호를 입력하세요.");return}let q;if(state.selectedVehicleId&&transportVehicles().some(v=>v.id===state.selectedVehicleId))q=supabaseClient.from("fleet_vehicles").update(row).eq("id",state.selectedVehicleId);else q=supabaseClient.from("fleet_vehicles").insert(row);const {error}=await q;if(error){toast("운송팀 차량 저장 실패: "+error.message);return}await loadVehicles();renderTransport();renderTripEmployeeOptions();toast("운송팀 차량정보를 저장했습니다.")}
+window.selectTransportVehicle=id=>{state.selectedVehicleId=id;const v=state.vehicles.find(x=>x.id===id);if(!v)return;$("transportVehicleName").value=v.vehicle_name||"";$("transportVehicleNumber").value=v.vehicle_number||"";$("transportTonnage").value=v.tonnage||"";$("transportVehicleManager").value=v.manager_name||"신태선";$("transportMileage").value=v.current_mileage||0;$("transportInspection").value=v.inspection_expiry||"";$("transportStatus").value=v.status||"운행가능";renderTransport()}
+function clearTransportVehicle(){state.selectedVehicleId=null;["transportVehicleNumber","transportMileage","transportInspection"].forEach(id=>{if($(id))$(id).value=""});$("transportVehicleName").value="화물차";$("transportTonnage").value="5톤";$("transportVehicleManager").value="신태선";$("transportStatus").value="운행가능";renderTransport()}
+async function saveTransportVehicle(){if(!has("vehicles_manage")&&!state.profile?.is_super_admin){toast("차량 관리 권한이 필요합니다.");return}const row={vehicle_group:"transport",vehicle_name:$("transportVehicleName").value.trim()||"화물차",vehicle_number:$("transportVehicleNumber").value.trim(),tonnage:$("transportTonnage").value,manager_name:$("transportVehicleManager").value.trim()||"신태선",current_mileage:Number($("transportMileage").value||0),inspection_expiry:$("transportInspection").value||null,status:$("transportStatus").value||"운행가능",updated_at:new Date().toISOString()};if(!row.vehicle_number){toast("차량번호를 입력하세요.");return}let q;if(state.selectedVehicleId&&transportVehicles().some(v=>v.id===state.selectedVehicleId))q=supabaseClient.from("fleet_vehicles").update(row).eq("id",state.selectedVehicleId);else q=supabaseClient.from("fleet_vehicles").insert(row);const {error}=await q;if(error){toast("운송팀 차량 저장 실패: "+error.message);return}await loadVehicles();renderTransport();renderTripEmployeeOptions();toast("운송팀 차량정보를 저장했습니다.")}
 async function saveTransportMaintenance(){const vehicleId=$("transportMaintenanceVehicle").value;if(!vehicleId){toast("차량을 선택하세요.");return}const reporter=state.profile?.name||"";const status=reporter==="엄수현"?"manager_review":"final_review";const row={vehicle_id:vehicleId,maintenance_date:$("transportMaintenanceDate").value,maintenance_type:$("transportMaintenanceType").value,mileage_km:Number($("transportMaintenanceMileage").value||0),shop_name:$("transportMaintenanceShop").value.trim(),cost:Number($("transportMaintenanceCost").value||0),next_due_date:$("transportMaintenanceNextDate").value||null,next_due_mileage:Number($("transportMaintenanceNextMileage").value||0)||null,memo:$("transportMaintenanceMemo").value.trim(),reported_by:state.user.id,reported_by_name:reporter,workflow_status:status,updated_at:new Date().toISOString()};const {error}=await supabaseClient.from("vehicle_maintenance").insert(row);if(error){toast("정비 등록 실패: "+error.message);return}await loadVehicleMaintenance();renderTransport();renderPendingWorkAlerts(true);toast(status==="manager_review"?"신태선 대리에게 1차 결재가 전달됩니다.":"손동오 관리자에게 최종 결재가 전달됩니다.")}
 function transportWorkflowLabel(v){return ({manager_review:"신태선 결재대기",final_review:"손동오 결재대기",approved:"결재완료",rejected:"반려"})[v]||vehicleWorkflowLabel(v)}
 function transportMaintenanceActions(x){const a=[];if(currentUserIs("신태선")&&x.workflow_status==="manager_review")a.push(`<button class="btn small primary" onclick="transportManagerApprove('${x.id}',true)">결재</button><button class="btn small danger" onclick="transportManagerApprove('${x.id}',false)">반려</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="final_review")a.push(`<button class="btn small primary" onclick="approveMaintenance('vehicle','${x.id}',true)">최종결재</button><button class="btn small danger" onclick="approveMaintenance('vehicle','${x.id}',false)">반려</button>`);return a.join(" ")||"-"}
@@ -3048,7 +3072,7 @@ function exportVehicleExcel(vehicleId=null){
   const v=vehicleId?state.vehicles.find(x=>x.id===vehicleId):null;
   XLSX.writeFile(wb,v?`${v.vehicle_name}_${v.vehicle_number}_차량운행일지.xlsx`:`서린컴퍼니_전체차량운행일지.xlsx`,{cellStyles:true});
 }
-function activateVehicleTab(tab){document.querySelectorAll(".vehicle-tab").forEach(x=>x.classList.toggle("active",x.dataset.vtab===tab));["basic","trip","maintenance","forklift"].forEach(t=>$("vehicle"+t.charAt(0).toUpperCase()+t.slice(1)+"Panel")?.classList.toggle("hidden",tab!==t))}
+function activateVehicleTab(tab){document.querySelectorAll(".vehicle-tab").forEach(x=>x.classList.toggle("active",x.dataset.vtab===tab));["basic","trip","maintenance"].forEach(t=>$("vehicle"+t.charAt(0).toUpperCase()+t.slice(1)+"Panel")?.classList.toggle("hidden",tab!==t))}
 
 function forkliftLabel(id){const x=state.forkliftAssets.find(v=>String(v.id)===String(id));return x?`${x.location} · ${x.asset_name}`:"지게차"}
 function clearForklift(){state.editingForkliftId=null;["forkliftName","forkliftLocation","forkliftManager","forkliftMemo"].forEach(id=>{if($(id))$(id).value=""});if($("forkliftHours"))$("forkliftHours").value=0;if($("forkliftStatus"))$("forkliftStatus").value="사용중"}
