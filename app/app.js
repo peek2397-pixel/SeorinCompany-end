@@ -184,7 +184,7 @@ async function createDinnerRoom(){
   const map=new Map(getDinnerEmployeeRows().map(x=>[String(x.id),x]));const allIds=[...new Set([String(state.user.id),...state.selectedDinnerEmployeeIds.map(String)])];
   const members=allIds.map(id=>({user_id:id,member_name:id===String(state.user.id)?(state.profile?.name||'관리자'):(map.get(id)?.name||'직원')}));
   const {data:room,error}=await supabaseClient.rpc('create_dinner_room_secure',{p_title:title,p_dinner_date:dinnerDate,p_password:password,p_members:members});
-  if(error){toast('회식방 생성 실패: '+error.message);return;}
+  if(error){const msg=String(error.message||'');if(msg.includes('create_dinner_room_secure')||msg.includes('schema cache')){toast('회식방 DB 함수가 없습니다. SQL/00_RUN_FIRST_V85_DINNER_FIX.sql을 Supabase에서 먼저 실행하세요.');}else{toast('회식방 생성 실패: '+msg);}return;}
   const roomId=typeof room==='string'?room:room?.id||room;
   clearDinnerRoomForm();await loadDinnerRooms();renderDinnerRooms();state.unlockedDinnerRoomIds.add(String(roomId));await selectDinnerRoom(roomId,true);toast('회식방을 만들었습니다. 참여 직원에게 잠시 후 알림이 표시됩니다.');
 }
