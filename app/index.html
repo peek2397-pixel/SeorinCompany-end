@@ -64,6 +64,7 @@
 
         </div>
 
+
         <div class="content-grid">
           <article class="panel span-2">
             <div class="panel-head"><div><h3>오늘·내일 회사 일정</h3><small>B2C 행사와 회의실 예약을 함께 표시합니다.</small></div></div>
@@ -641,47 +642,14 @@
         <div class="panel"><div class="panel-head"><h3>출장 내역</h3><input id="businessTripMonth" type="month" /></div><div id="businessTripTable"></div></div>
       </section>
 
-      <section id="transportPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
-        <div class="panel vehicle-top-panel">
-          <div class="panel-head">
-            <div><h3>운송팀 차량관리</h3><small>기존 차량관리와 같은 방식으로 실제 차량번호를 등록하고 카드에서 선택해 수정합니다.</small></div>
-            <div class="actions compact-actions"><button class="btn" type="button" onclick="clearTransportVehicle()">신규 차량 등록</button><button class="btn primary" onclick="exportVehicleExcel()">전체 차량 엑셀</button></div>
-          </div>
-          <div class="transport-vehicle-editor">
-            <div class="form-grid">
-              <label>차량명<input id="transportVehicleName" value="화물차" placeholder="예: 5톤 화물차" /></label>
-              <label>차량번호<input id="transportVehicleNumber" placeholder="예: 12가3456" /></label>
-              <label>톤수<select id="transportTonnage"><option>5톤</option><option>3.5톤</option><option>1톤</option></select></label>
-              <label>담당자<input id="transportVehicleManager" value="신태선" /></label>
-              <label>현재 주행거리<input id="transportMileage" type="number" min="0" placeholder="0" /></label>
-              <label>검사 만료일<input id="transportInspection" type="date" /></label>
-              <label>상태<select id="transportStatus"><option>운행가능</option><option>정비중</option><option>사용중지</option></select></label>
-            </div>
-            <div class="actions"><button id="saveTransportVehicleBtn" class="btn primary">차량 저장</button><button class="btn" type="button" onclick="clearTransportVehicle()">입력 초기화</button></div>
-          </div>
-          <div class="panel-head transport-list-head"><h3>등록 차량</h3><small>카드를 클릭하면 위 입력란에 차량정보가 불러와져 수정할 수 있습니다.</small></div>
-          <div id="transportVehicleCards" class="vehicle-card-grid"></div>
-        </div>
-        <div class="content-grid">
-          <article class="panel">
-            <div class="panel-head"><div><h3>운송팀 정비·소모품 등록</h3><small>엄수현 등록 → 신태선 결재 → 손동오 최종결재 / 신태선 등록 → 손동오 최종결재</small></div></div>
-            <div class="form-grid">
-              <label>차량<select id="transportMaintenanceVehicle"></select></label><label>정비일<input id="transportMaintenanceDate" type="date" /></label>
-              <label>항목<select id="transportMaintenanceType"><option>엔진오일</option><option>미션오일</option><option>브레이크오일</option><option>냉각수</option><option>요소수</option><option>에어필터</option><option>오일필터</option><option>연료필터</option><option>타이어</option><option>배터리</option><option>와이퍼</option><option>일반 수리</option><option>기타 부품</option></select></label>
-              <label>당시 주행거리<input id="transportMaintenanceMileage" type="number" min="0" /></label><label>정비업체<input id="transportMaintenanceShop" /></label><label>금액<input id="transportMaintenanceCost" type="number" min="0" /></label>
-              <label>다음 예정일<input id="transportMaintenanceNextDate" type="date" /></label><label>다음 예정 km<input id="transportMaintenanceNextMileage" type="number" min="0" /></label><label class="span-2">메모<input id="transportMaintenanceMemo" /></label>
-            </div><div class="actions"><button id="saveTransportMaintenanceBtn" class="btn primary">정비 보고 등록</button></div>
-          </article>
-        </div>
-        <div class="panel"><div class="panel-head"><h3>운송팀 정비 결재 현황</h3></div><div id="transportMaintenanceTable"></div></div>
-      </section>
+      <section id="transportPage" class="page"></section>
 
-      <section id="vehiclesPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
+      <section id="vehiclesPage" class="page"><div class="asset-tabs"><button class="btn" data-asset-tab="transport" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn primary" data-asset-tab="company" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" data-asset-tab="forklift" onclick="switchAssetTab('forklift')">지게차</button><button id="assetManageBtn" class="btn" data-asset-tab="manage" onclick="openAssetManagement()">관리</button></div>
         <div class="panel vehicle-top-panel">
           <div class="panel-head">
             <div>
-              <h3>차량관리</h3>
-              <small>차량 기본정보, 운행일지, 정비·수리 이력을 차량별로 관리합니다.</small>
+              <h3 id="vehiclePageTitle">일반 차량관리</h3>
+              <small id="vehiclePageSub">차량 기본정보, 운행일지, 정비·수리 이력을 차량별로 관리합니다.</small>
             </div>
             <div class="actions compact-actions">
               <button id="exportSelectedVehicleExcelBtn" class="btn">선택 차량 엑셀</button>
@@ -693,7 +661,8 @@
         </div>
 
         <div class="vehicle-tabs vehicle-main-tabs">
-          <button class="vehicle-tab active" data-vtab="basic">차량 기본정보</button>
+          <button class="vehicle-tab active" data-vtab="basic">차량정보 관리</button>
+          <button class="vehicle-tab" data-vtab="inspection">자동차 검사</button>
           <button class="vehicle-tab" data-vtab="trip">운행일지</button>
           <button class="vehicle-tab" data-vtab="maintenance">차량 정비·소모품</button>
         </div>
@@ -701,15 +670,15 @@
         <section id="vehicleBasicPanel" class="vehicle-tab-panel">
           <div class="content-grid">
             <article class="panel">
-              <div class="panel-head"><h3>차량 등록·수정</h3></div>
+              <div class="panel-head"><div><h3>차량 등록·수정</h3><small>관리자 전용: 일반 차량·운송팀 차량을 등록, 수정, 삭제합니다.</small></div></div>
               <div class="form-grid">
-                <label>구분<select id="vehicleGroup"><option value="company">일반 차량</option><option value="transport">운송팀</option></select></label>
+                <label>구분<select id="vehicleGroup"><option value="company">일반 차량</option><option value="transport">운송팀 차량</option></select></label>
                 <label>톤수<select id="vehicleTonnage"><option value="">해당 없음</option><option>5톤</option><option>3.5톤</option><option>1톤</option></select></label>
                 <label>차량명<input id="vehicleName" placeholder="예: 모하비 / 화물차" /></label>
                 <label>차량번호<input id="vehicleNumber" placeholder="예: 22우8010" /></label>
                 <label>담당자<input id="vehicleManager" /></label>
                 <label>현재 주행거리<input id="vehicleMileage" type="number" min="0" /></label>
-                <label>검사 만료일<input id="vehicleInspection" type="date" /></label>
+                <label>최근 검사 완료일<input id="vehicleLastInspection" type="date" /></label><label>다음 검사 만료일<input id="vehicleInspection" type="date" /></label>
                 <label>상태<select id="vehicleStatus"><option value="운행가능">운행가능</option><option value="정비중">정비중</option><option value="사용중지">사용중지</option></select></label>
                 <label>비고<input id="vehicleMemo" /></label>
               </div>
@@ -726,6 +695,29 @@
           </div>
         </section>
 
+
+        <section id="vehicleInspectionPanel" class="vehicle-tab-panel hidden">
+          <div class="content-grid">
+            <article class="panel">
+              <div class="panel-head"><div><h3>자동차 검사 완료 처리</h3><small>모든 일반 차량과 운송팀 차량에 적용됩니다. 담당 직원이 검사 완료 후 다음 만료일을 등록합니다.</small></div></div>
+              <div id="vehicleInspectionCurrent" class="inspection-current"></div>
+              <div class="form-grid">
+                <label>차량<select id="inspectionVehicle"></select></label>
+                <label>검사 완료일<input id="inspectionCompletedDate" type="date" /></label>
+                <label>다음 검사 만료일<input id="inspectionNextExpiry" type="date" /></label>
+                <label>검사기관<input id="inspectionAgency" placeholder="선택 입력" /></label>
+                <label class="span-2">비고<input id="inspectionMemo" placeholder="검사 결과 또는 특이사항" /></label>
+              </div>
+              <div class="actions"><button id="completeVehicleInspectionBtn" class="btn primary">검사 완료 저장</button><button id="clearVehicleInspectionBtn" class="btn">입력 초기화</button></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head"><div><h3>검사 예정 알림</h3><small>직원이 완료 처리할 때까지 최근 공지·업무 알림에 유지됩니다.</small></div></div>
+              <div id="vehicleInspectionAlertList" class="list"></div>
+            </article>
+          </div>
+          <div class="panel"><div class="panel-head"><h3>자동차 검사 이력</h3></div><div id="vehicleInspectionHistory"></div></div>
+        </section>
+
         <section id="vehicleTripPanel" class="panel vehicle-tab-panel hidden">
           <div class="panel-head">
             <div><h3>운행일지</h3><small>선택한 차량의 운행기록을 등록하고 월별로 확인합니다.</small></div>
@@ -735,10 +727,13 @@
             <label>차량<select id="tripVehicle"></select></label><label>운행일<input id="tripDate" type="date" /></label>
             <label>부서<input id="tripDepartment" /></label><label>운전자<input id="tripDriver" /></label>
             <label>출발지<input id="tripStartPlace" /></label><label>도착지<input id="tripEndPlace" /></label>
-            <label class="span-2">주소·운행목적<input id="tripPurpose" /></label>
-            <label>주행 km<input id="tripDistance" type="number" min="0" step="0.1" /></label>
-            <label>최종 계기판 km<input id="tripOdometer" type="number" min="0" step="0.1" /></label>
-            <label>주유금액<input id="tripFuelCost" type="number" min="0" /></label><label>메모<input id="tripMemo" /></label>
+            <label>출발 주행거리<input id="tripStartOdometer" type="number" min="0" step="0.1" oninput="calcTripDistance()" /></label>
+            <label>도착 주행거리<input id="tripEndOdometer" type="number" min="0" step="0.1" oninput="calcTripDistance()" /></label>
+            <label>운행거리<input id="tripDistance" type="number" min="0" step="0.1" /></label>
+            <label>주유비<input id="tripFuelCost" type="number" min="0" /></label>
+            <label>통행료<input id="tripTollCost" type="number" min="0" /></label>
+            <label class="span-2">운행 목적<input id="tripPurpose" /></label>
+            <label class="span-2">비고<input id="tripMemo" /></label>
           </div>
           <div class="actions"><button id="saveVehicleTripBtn" class="btn primary">운행일지 저장</button><button id="clearVehicleTripBtn" class="btn">초기화</button></div>
           <div id="vehicleTripTable"></div>
@@ -801,6 +796,16 @@
           <article class="panel"><div class="panel-head"><h3>오늘 회식 메뉴</h3></div><div class="game-result" id="dinnerMenuResult">버튼을 눌러 메뉴를 추천받으세요.</div><button class="btn primary" onclick="pickDinnerMenu()">메뉴 추천</button></article>
           <article class="panel"><div class="panel-head"><h3>참가자</h3></div><label>이름(쉼표 또는 줄바꿈)<textarea id="dinnerNames" placeholder="손동오, 김헌정, 곽규탁"></textarea></label><label>사다리 결과<textarea id="dinnerResults" placeholder="커피 사기, 계산, 면제"></textarea></label><div class="actions"><button class="btn primary" onclick="runDinnerLadder()">사다리타기</button><button class="btn" onclick="runDinnerRoulette()">룰렛</button></div></article>
           <article class="panel span-2"><div class="panel-head"><h3>게임 결과</h3></div><div class="game-result" id="dinnerGameResult">결과가 여기에 표시됩니다.</div></article>
+          <article class="panel span-2">
+            <div class="panel-head"><div><h3>직원 비밀방</h3><small>선택한 직원만 참여하는 회식 전용 그룹 대화방입니다.</small></div></div>
+            <div class="form-grid">
+              <label>방 이름<input id="dinnerSecretRoomName" placeholder="예: 7월 물류팀 회식 비밀방" /></label>
+              <label class="span-2">참여 직원 이름<textarea id="dinnerSecretMembers" placeholder="곽규탁, 엄수현, 김헌정
+이름은 쉼표 또는 줄바꿈으로 구분하세요."></textarea></label>
+            </div>
+            <div id="dinnerSecretMemberResult" class="muted-text">직원 이름을 입력한 뒤 비밀방 만들기를 누르세요.</div>
+            <div class="actions"><button class="btn primary" onclick="createDinnerSecretRoom()">비밀방 만들기</button></div>
+          </article>
         </div>
       </section>
       <section id="accountPage" class="page">
