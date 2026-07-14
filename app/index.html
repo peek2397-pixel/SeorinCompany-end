@@ -659,7 +659,7 @@
             <button class="admin-choice-card" type="button" onclick="openVehicleAdminSection('transport')"><b>운송팀 차량</b><span>5톤·3.5톤·1톤 차량 등록·수정·삭제</span></button>
             <button class="admin-choice-card" type="button" onclick="openVehicleAdminSection('company')"><b>일반 차량</b><span>회사 일반 차량 등록·수정·삭제</span></button>
             <button class="admin-choice-card" type="button" onclick="openForkliftAdminFromHub()"><b>지게차</b><span>종합물류·3물류 지게차 등록·수정·삭제</span></button>
-            <button class="admin-choice-card danger-card" type="button" onclick="clearTestOperationalData()"><b>테스트 입력자료 전체 삭제</b><span>회식방·출장·운행/정비·검사·구매·일정 테스트 자료 삭제</span></button>
+            <button class="admin-choice-card danger-card" type="button" onclick="openTestDataManager()"><b>입력자료 선택 삭제</b><span>자료 종류를 클릭하고 삭제할 항목만 선택합니다.</span></button>
           </div>
         </section>
         <div id="vehicleBrowsePanel" class="panel vehicle-top-panel">
@@ -829,6 +829,13 @@
             <div id="forkliftMaintenanceTable"></div>
           </article>
         </section>
+
+          <section id="testDataManagerPanel" class="panel hidden test-data-manager-panel">
+            <div class="panel-head"><div><h3>입력자료 선택 삭제</h3><small>자료 종류를 선택한 뒤 삭제할 행만 체크하세요. 기본정보는 삭제되지 않습니다.</small></div><button class="btn" type="button" onclick="closeTestDataManager()">닫기</button></div>
+            <div id="testDataCategoryButtons" class="test-data-category-buttons"></div>
+            <div class="panel-head compact-head"><div><b id="testDataSelectedCount">0건 선택</b></div><div class="actions"><button class="btn" type="button" onclick="toggleAllTestDataRecords()">전체 선택/해제</button><button class="btn danger" type="button" onclick="deleteSelectedTestData()">선택 삭제</button></div></div>
+            <div id="testDataRecordList" class="test-data-record-list"><div class="empty">위에서 자료 종류를 선택하세요.</div></div>
+          </section>
 
       <section id="dinnerPage" class="page">
         <div class="dinner-layout">

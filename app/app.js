@@ -148,7 +148,20 @@ function dinnerToday(){return new Date().toISOString().slice(0,10)}
 function shuffleDinner(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const n=Math.floor(Math.random()*(i+1));[a[i],a[n]]=[a[n],a[i]]}return a}
 function getDinnerEmployeeRows(){
   const registryByNo=new Map((state.employeeRegistry||[]).map(x=>[String(x.emp_no||""),x]));
-  return (state.employees||[]).filter(x=>x.id&&x.is_active!==false).map(x=>({...x,name:x.name||registryByNo.get(String(x.emp_no||""))?.name||""})).filter(x=>x.name);
+  return (state.employees||[])
+    .filter(x=>x.id&&x.is_active!==false)
+    .map(x=>{
+      const r=registryByNo.get(String(x.emp_no||""))||{};
+      return {
+        ...r,
+        ...x,
+        name:x.name||r.name||"",
+        department:x.department||r.department||"미지정 부서",
+        team:x.team||r.team||x.department||r.department||"미지정 팀",
+        position:x.position||r.position||""
+      };
+    })
+    .filter(x=>x.name);
 }
 function clearDinnerRoomForm(){
   if($("dinnerRoomName"))$("dinnerRoomName").value="";
@@ -159,16 +172,28 @@ function clearDinnerRoomForm(){
 function renderDinnerEmployeePicker(){
   const teamBox=$("dinnerDepartmentPicker"), box=$("dinnerEmployeePicker");if(!box)return;
   const all=getDinnerEmployeeRows();
-  const employeeTeam=x=>String(x.team||x.department||"미지정").trim()||"미지정";
-  const departments=[...new Set(all.map(employeeTeam))].sort((a,b)=>a.localeCompare(b,"ko"));
-  if(!state.dinnerSelectedDepartment||!departments.includes(state.dinnerSelectedDepartment))state.dinnerSelectedDepartment=departments[0]||"";
-  if(teamBox){
-    teamBox.innerHTML=departments.length?departments.map(d=>`<button type="button" class="btn small ${d===state.dinnerSelectedDepartment?'primary':''}" data-dinner-department="${escapeHtml(d)}">${escapeHtml(d)}</button>`).join(""):`<span class="muted-text">등록된 팀이 없습니다.</span>`;
-    teamBox.querySelectorAll('[data-dinner-department]').forEach(btn=>btn.addEventListener('click',()=>{state.dinnerSelectedDepartment=btn.dataset.dinnerDepartment||"";renderDinnerEmployeePicker();}));
-  }
   const q=normalizeDinnerName($("dinnerEmployeeSearch")?.value||"");
-  const rows=all.filter(x=>employeeTeam(x)===state.dinnerSelectedDepartment).filter(x=>!q||normalizeDinnerName(x.name).includes(q));
-  box.innerHTML=rows.length?rows.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join(""):`<span class="muted-text">이 팀에 표시할 직원이 없습니다.</span>`;
+  const grouped=new Map();
+  all.forEach(emp=>{
+    const department=String(emp.department||"미지정 부서").trim()||"미지정 부서";
+    const team=String(emp.team||department||"미지정 팀").trim()||"미지정 팀";
+    const key=`${department}||${team}`;
+    if(!grouped.has(key))grouped.set(key,{department,team,employees:[]});
+    if(!q||normalizeDinnerName(emp.name).includes(q)||normalizeDinnerName(team).includes(q)||normalizeDinnerName(department).includes(q))grouped.get(key).employees.push(emp);
+  });
+  const groups=[...grouped.values()].filter(g=>g.employees.length).sort((a,b)=>`${a.department}${a.team}`.localeCompare(`${b.department}${b.team}`,"ko"));
+  if(teamBox){
+    teamBox.innerHTML=groups.length?groups.map((g,i)=>`<button type="button" class="btn small ${i===0?'primary':''}" data-dinner-group="${escapeHtml(`${g.department}||${g.team}`)}">${escapeHtml(g.department)} · ${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join(""):`<span class="muted-text">부서·팀 정보를 불러오지 못했습니다.</span>`;
+    teamBox.querySelectorAll('[data-dinner-group]').forEach(btn=>btn.addEventListener('click',()=>{
+      const target=document.querySelector(`[data-dinner-employee-group="${CSS.escape(btn.dataset.dinnerGroup)}"]`);
+      target?.scrollIntoView({behavior:'smooth',block:'nearest'});
+      teamBox.querySelectorAll('[data-dinner-group]').forEach(x=>x.classList.toggle('primary',x===btn));
+    }));
+  }
+  box.innerHTML=groups.length?groups.map(g=>{
+    const key=`${g.department}||${g.team}`;
+    return `<section class="dinner-employee-group" data-dinner-employee-group="${escapeHtml(key)}"><h4>${escapeHtml(g.department)} <span>· ${escapeHtml(g.team)}</span></h4><div class="dinner-employee-group-list">${g.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
+  }).join(""):`<span class="muted-text">표시할 직원이 없습니다. 직원관리에서 부서·팀 정보를 확인하세요.</span>`;
   box.querySelectorAll('[data-dinner-employee]').forEach(btn=>btn.addEventListener('click',()=>{
     const id=String(btn.dataset.dinnerEmployee);const set=new Set(state.selectedDinnerEmployeeIds.map(String));set.has(id)?set.delete(id):set.add(id);state.selectedDinnerEmployeeIds=[...set];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
   }));
@@ -3463,24 +3488,65 @@ function forkliftCard(x){const electric=(x.equipment_type||"전동")==="전동";
 window.deleteForkliftMaintenance=async function(id){if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}if(!confirm("이 지게차 정비 이력을 삭제할까요?"))return;const {error}=await supabaseClient.from("forklift_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}await loadForkliftMaintenance();renderForklifts();toast("지게차 정비 이력을 삭제했습니다.")};
 function renderForklifts(){if(!$("forkliftAssetCards"))return;const admin=isAssetAdmin();const mt=$("forkliftManageToggleBtn");if(mt)mt.style.display=admin?"":"none";if(!admin)$("forkliftManagePanel")?.classList.add("hidden");const opts=state.forkliftAssets.map(x=>`<option value="${x.id}">${escapeHtml(x.location)} · ${escapeHtml(x.asset_name)}</option>`).join("");$("forkliftMaintenanceAsset").innerHTML=opts;const locations=["종합물류","3물류"];$("forkliftAssetCards").innerHTML=locations.map(loc=>{const rows=state.forkliftAssets.filter(x=>x.location===loc);const electric=rows.filter(x=>(x.equipment_type||"전동")==="전동");const diesel=rows.filter(x=>x.equipment_type==="디젤");return `<section class="forklift-location"><h3>${loc}</h3><h4>전동지게차 (${electric.length}대)</h4><div class="vehicle-card-grid">${electric.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div><h4>디젤지게차 (${diesel.length}대)</h4><div class="vehicle-card-grid">${diesel.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div></section>`}).join("");$("forkliftMaintenanceTable").innerHTML=tableHtml(["작업일","지게차","항목","가동시간","증류수 보충일","업체","금액","다음 기준","상태","처리정보","관리"],state.forkliftMaintenance.map(x=>{const a=state.forkliftAssets.find(v=>String(v.id)===String(x.forklift_id));return[x.maintenance_date,forkliftLabel(x.forklift_id),x.maintenance_type,`${Number(x.operating_hours||0).toLocaleString()}시간`,x.maintenance_type==="증류수 보충"?x.maintenance_date:(a?.last_distilled_water_date||"-"),x.shop_name||"",money(x.cost),x.next_due_date||((x.next_due_hours||"")+"시간"),vehicleWorkflowLabel(x.workflow_status),`보고 ${x.reported_by_name||"-"}<br>금액확인 ${x.amount_checked_by_name||"-"}<br>결재 ${x.approved_by_name||"-"}`,forkliftMaintenanceActions(x)]}))}
 
-async function clearTestOperationalData(){
-  if(!isAssetAdmin()){toast("최고관리자만 테스트 자료를 삭제할 수 있습니다.");return;}
-  if(!confirm("테스트 중 입력한 운영자료를 삭제할까요?\n직원·권한·차량·지게차 기본정보는 유지됩니다."))return;
-  if(!confirm("정말 삭제하시겠습니까? 삭제 후 복구할 수 없습니다."))return;
-  const tables=[
-    "dinner_rooms","business_trips","vehicle_trip_logs","vehicle_maintenance","vehicle_inspections",
-    "purchase_requests","company_events","meeting_bookings"
-  ];
-  const failed=[];
-  for(const table of tables){
-    try{const {error}=await supabaseClient.from(table).delete().not("id","is",null);if(error)failed.push(`${table}: ${error.message}`);}catch(e){failed.push(`${table}: ${e.message}`)}
-  }
-  await Promise.allSettled([loadDinnerRooms(),loadBusinessTrips(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadPurchaseRequests(),loadCompanyEvents(),loadMeetingBookings()]);
-  renderAll();
-  toast(failed.length?`일부 자료 삭제 실패 (${failed.length}개). 콘솔을 확인하세요.`:"테스트 입력자료를 모두 삭제했습니다.");
-  if(failed.length)console.error("테스트 자료 삭제 실패",failed);
+const TEST_DATA_CATEGORIES={
+  dinner_rooms:{label:"회식방",date:"dinner_date",title:r=>`${r.title||'회식방'} · ${r.dinner_date||''}`},
+  business_trips:{label:"출장",date:"start_date",title:r=>`${r.destination||r.purpose||'출장'} · ${r.start_date||''}`},
+  vehicle_trip_logs:{label:"차량 운행일지",date:"trip_date",title:r=>`${r.driver_name||'운전자'} · ${r.trip_date||''} · ${r.purpose||''}`},
+  vehicle_maintenance:{label:"차량 정비",date:"maintenance_date",title:r=>`${r.maintenance_type||'정비'} · ${r.maintenance_date||''}`},
+  vehicle_inspections:{label:"자동차 검사",date:"completed_date",title:r=>`${r.completed_by_name||'검사'} · ${r.completed_date||''}`},
+  purchase_requests:{label:"구매 신청",date:"created_at",title:r=>`${r.item_name||r.product_name||r.purpose||'구매'} · ${String(r.created_at||'').slice(0,10)}`},
+  company_events:{label:"회사 일정",date:"start_date",title:r=>`${r.title||'일정'} · ${r.start_date||''}`},
+  meeting_bookings:{label:"회의실 예약",date:"meeting_date",title:r=>`${r.title||'회의'} · ${r.meeting_date||''}`},
+  card_usages:{label:"법인카드",date:"usage_date",title:r=>`${r.card_holder_name||r.user_name||'카드'} · ${r.merchant_name||r.store_name||r.usage_place||''} · ${Number(r.amount||r.usage_amount||0).toLocaleString()}원`}
+};
+let testDataSelection={table:"",rows:[],selected:new Set()};
+function openTestDataManager(){
+  if(!isAssetAdmin()){toast("최고관리자만 입력자료를 삭제할 수 있습니다.");return;}
+  $("testDataManagerPanel")?.classList.remove("hidden");
+  renderTestDataCategoryButtons();
+  $("testDataManagerPanel")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
-window.clearTestOperationalData=clearTestOperationalData;
+function closeTestDataManager(){$("testDataManagerPanel")?.classList.add("hidden");testDataSelection={table:"",rows:[],selected:new Set()};}
+function renderTestDataCategoryButtons(){
+  const box=$("testDataCategoryButtons");if(!box)return;
+  box.innerHTML=Object.entries(TEST_DATA_CATEGORIES).map(([table,c])=>`<button type="button" class="btn ${testDataSelection.table===table?'primary':''}" data-test-table="${table}">${c.label}</button>`).join("");
+  box.querySelectorAll('[data-test-table]').forEach(b=>b.addEventListener('click',()=>loadTestDataCategory(b.dataset.testTable)));
+}
+async function loadTestDataCategory(table){
+  const meta=TEST_DATA_CATEGORIES[table];if(!meta)return;
+  testDataSelection={table,rows:[],selected:new Set()};renderTestDataCategoryButtons();
+  const list=$("testDataRecordList");if(list)list.innerHTML='<div class="empty">불러오는 중...</div>';
+  const {data,error}=await supabaseClient.from(table).select('*').order(meta.date||'created_at',{ascending:false}).limit(500);
+  if(error){if(list)list.innerHTML=`<div class="empty">조회 실패: ${escapeHtml(error.message)}</div>`;return;}
+  testDataSelection.rows=data||[];renderTestDataRecords();
+}
+function renderTestDataRecords(){
+  const list=$("testDataRecordList");if(!list)return;
+  const meta=TEST_DATA_CATEGORIES[testDataSelection.table];
+  list.innerHTML=testDataSelection.rows.length?testDataSelection.rows.map(r=>`<label class="test-data-record"><input type="checkbox" data-test-record="${escapeHtml(String(r.id))}" ${testDataSelection.selected.has(String(r.id))?'checked':''}/><span><b>${escapeHtml(meta.title(r))}</b><small>ID ${escapeHtml(String(r.id))}</small></span></label>`).join(''):'<div class="empty">등록된 입력자료가 없습니다.</div>';
+  list.querySelectorAll('[data-test-record]').forEach(c=>c.addEventListener('change',()=>{c.checked?testDataSelection.selected.add(String(c.dataset.testRecord)):testDataSelection.selected.delete(String(c.dataset.testRecord));updateTestDataSelectedCount();}));
+  updateTestDataSelectedCount();
+}
+function updateTestDataSelectedCount(){if($("testDataSelectedCount"))$("testDataSelectedCount").textContent=`${testDataSelection.selected.size}건 선택`;}
+function toggleAllTestDataRecords(){
+  const all=testDataSelection.rows.map(r=>String(r.id));
+  testDataSelection.selected=testDataSelection.selected.size===all.length?new Set():new Set(all);renderTestDataRecords();
+}
+async function deleteSelectedTestData(){
+  if(!testDataSelection.table||!testDataSelection.selected.size){toast("삭제할 자료를 선택하세요.");return;}
+  const label=TEST_DATA_CATEGORIES[testDataSelection.table]?.label||"입력자료";
+  if(!confirm(`${label} ${testDataSelection.selected.size}건을 삭제할까요?`))return;
+  const ids=[...testDataSelection.selected];
+  const {error}=await supabaseClient.from(testDataSelection.table).delete().in('id',ids);
+  if(error){toast("선택 삭제 실패: "+error.message);return;}
+  await loadTestDataCategory(testDataSelection.table);
+  await Promise.allSettled([loadDinnerRooms(),loadBusinessTrips(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadPurchaseRequests(),loadCompanyEvents(),loadMeetingBookings(),loadCards()]);
+  renderAll();toast(`${label} ${ids.length}건을 삭제했습니다.`);
+}
+window.openTestDataManager=openTestDataManager;
+window.closeTestDataManager=closeTestDataManager;
+window.toggleAllTestDataRecords=toggleAllTestDataRecords;
+window.deleteSelectedTestData=deleteSelectedTestData;
 
 function renderDashboardSchedule(){if(!$("dashboardScheduleList"))return;const today=isoDateOffset(0),tomorrow=isoDateOffset(1);let items=[];state.companyEvents.filter(x=>x.start_date<=tomorrow&&x.end_date>=today).forEach(x=>items.push({d:x.start_date,label:`${eventStatus(x)} · ${eventTypeLabel(x.event_type)} · ${x.title}`,meta:`${x.event_time||""} ${x.location||""}`}));state.meetingBookings.filter(x=>x.meeting_date>=today&&x.meeting_date<=tomorrow).forEach(x=>items.push({d:x.meeting_date,label:`회의 · ${x.title}`,meta:`${String(x.start_time).slice(0,5)} ${x.meeting_with||""}`}));items.sort((a,b)=>a.d.localeCompare(b.d));$("dashboardScheduleList").innerHTML=items.map(x=>`<div class="list-item"><b>${x.d===today?"오늘":"내일"} · ${escapeHtml(x.label)}</b><small>${escapeHtml(x.meta)}</small></div>`).join("")||`<div class="empty">오늘·내일 일정이 없습니다.</div>`}
 
