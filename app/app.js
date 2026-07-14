@@ -21,17 +21,16 @@ const pageInfo = {
   corporateCard:["법인카드","사용내역 등록, 정산 및 엑셀 다운로드"],
   inventory:["물품관리","요소수 등 물류 소모품 재고관리"],
   purchase:["구매관리","구매요청과 승인 상태 관리"],
-  b2b:["B2B 작업 통계","일일작업, 상세내역, 월별·반기 성과평가를 관리합니다."],
   calendar:["근무·휴무 달력","연차, 반차, 반반차, 주말근무와 대체휴일을 관리합니다."],
   contractors:["외주 업체 인력관리","날짜별 외주 출근·식사 인원과 점심 주문 수량을 관리합니다."],
   events:["회사 일정·B2C 행사","전 직원이 함께 확인하는 행사와 회사 일정을 관리합니다."],
   meetings:["회의실 예약","회의실 일정과 미팅 정보를 예약하고 확인합니다."],
   trips:["출장관리","출장 등록과 차량 지정, 출장자 식사 제외를 관리합니다."],
-  transport:["운송팀","운송팀 화물차와 정비 결재를 관리합니다."],
-  vehicles:["차량관리","차량 기본정보, 운행일지, 정비·수리 이력을 관리합니다."],
-  forklift:["지게차관리","지게차 등록, 증류수 보충, 가동시간과 부품 교환 이력을 관리합니다."],
+  transport:["차량·장비관리","일반 차량, 운송팀 차량, 지게차를 한 화면에서 선택해 관리합니다."],
+  vehicles:["일반 차량관리","회사 차량의 운행일지와 정비 이력을 관리합니다."],
+  forklift:["지게차관리","종합물류와 3물류의 전동·디젤 지게차를 관리합니다."],
+  dinner:["회식·게임","회식 메뉴 추천과 사다리타기·룰렛을 즐깁니다."],
   account:["내 정보·비밀번호","내 정보 확인과 비밀번호 변경"],
-  kpi:["KPI 관리","평가 권한자만 점수와 순위를 볼 수 있습니다."],
   employees:["직원관리","직원·부서·직급 정보를 관리합니다."],
   permissions:["권한관리","직원별로 보이는 화면과 기능을 지정합니다."]
 };
@@ -43,21 +42,18 @@ const menus = [
   ["private","1:1 비밀소통","private_messages_use"],
   ["corporateCard","법인카드","card_use"],
   ["purchase","구매·물품관리","purchase_view"],
-  ["b2b","B2B 작업 통계","b2b_view"],
   ["calendar","근무·휴무 달력","calendar_use"],
   ["events","회사 일정·B2C 행사","events_view"],
   ["meetings","회의실 예약","meetings_view"],
   ["contractors","외주 업체 인력관리","contractors_view"],
   ["trips","출장관리","calendar_use"],
-  ["transport","운송팀","vehicles_view"],
-  ["vehicles","차량관리","vehicles_view"],
-  ["forklift","지게차관리","vehicles_view"],
+  ["transport","차량·장비관리","vehicles_view"],
+  ["dinner","회식·게임","community_view"],
   ["account","내 정보·비밀번호","account_view"],
-  ["kpi","B2C KPI 관리","kpi_view"],
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[] };
 
 const $ = id => document.getElementById(id);
 
@@ -109,14 +105,12 @@ const PERMISSION_DEFS=[
   ["card_use","법인카드"],
   ["inventory_view","물품관리"],
   ["purchase_view","구매관리"],
-  ["b2b_view","B2B 작업 통계"],
   ["calendar_use","근무·휴무 달력"],
   ["events_view","회사 일정·B2C 행사"],
   ["meetings_view","회의실 예약"],
   ["contractors_view","외주 업체 인력관리"],
   ["vehicles_view","차량관리"],
   ["account_view","내 정보·비밀번호"],
-  ["kpi_view","B2C KPI 관리"],
   ["employees_manage","직원관리"],
   ["permissions_manage","권한관리"],
 
@@ -133,10 +127,6 @@ const PERMISSION_DEFS=[
   ["meetings_manage","회의실 예약 전체관리"],
   ["contractors_manage","외주 업체 인력 전체관리"],
   ["vehicles_manage","차량 등록·수정·삭제"],
-  ["b2b_manage","B2B 전체관리·평가"],
-  ["b2b_export","B2B 엑셀·백업"],
-  ["kpi_manage","B2C KPI 평가"],
-  ["kpi_export","B2C KPI 엑셀"]
 ];
 
 const BASIC_PERMISSIONS=new Set([
@@ -147,6 +137,12 @@ const BASIC_PERMISSIONS=new Set([
   "private_messages_use",
   "calendar_use"
 ]);
+
+const DINNER_MENUS=["삼겹살","닭갈비","소고기","초밥","중국요리","감자탕","곱창","치킨","회","족발","보쌈","샤브샤브"];
+function pickDinnerMenu(){const x=DINNER_MENUS[Math.floor(Math.random()*DINNER_MENUS.length)];$("dinnerMenuResult").textContent=x}
+function runDinnerRoulette(){const names=$("dinnerNames").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);if(!names.length){toast("참가자 이름을 입력하세요.");return}$("dinnerGameResult").textContent=names[Math.floor(Math.random()*names.length)]}
+function runDinnerLadder(){const names=$("dinnerNames").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);const results=$("dinnerResults").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);if(!names.length||!results.length){toast("참가자와 결과를 입력하세요.");return}const shuffled=[...results].sort(()=>Math.random()-.5);$("dinnerGameResult").innerHTML=names.map((n,i)=>`${escapeHtml(n)} → <b>${escapeHtml(shuffled[i%shuffled.length])}</b>`).join("<br>")}
+window.pickDinnerMenu=pickDinnerMenu;window.runDinnerRoulette=runDinnerRoulette;window.runDinnerLadder=runDinnerLadder;
 
 window.goPage = goPage; window.toggle = toggle;
 
@@ -166,19 +162,24 @@ function renderMenu(){
   });
   $("menu").innerHTML=rows.map(([id,label])=>{
     const target=id==="purchase"&&!has("purchase_view")&&has("inventory_view")?"inventory":id;
-    return `<button class="nav-btn" data-page="${id}" onclick="goPage('${target}')">${label}</button>`;
+    return `<button class="nav-btn" data-page="${id}" onclick="goPage('${target}')"><span>${label}</span><span class="nav-unread hidden" data-badge-for="${id}">0</span></button>`;
   }).join("");
+  updateMenuBadges();
+}
+function updateMenuBadges(){
+  const rooms=state.messengerRooms||[];
+  const direct=rooms.filter(r=>r.room_type==="direct").reduce((a,r)=>a+Number(r.unread_count||0),0);
+  const group=rooms.filter(r=>r.room_type!=="direct").reduce((a,r)=>a+Number(r.unread_count||0),0);
+  [["community",group],["private",direct]].forEach(([id,count])=>{
+    const el=document.querySelector(`[data-badge-for="${id}"]`);if(!el)return;el.textContent=count>99?"99+":String(count);el.classList.toggle("hidden",!count);
+  });
 }
 function goPage(id){
   if(id==="purchase"&&!has("purchase_view")&&has("inventory_view"))id="inventory";
   if(id==="inventory"&&!has("inventory_view")&&has("purchase_view"))id="purchase";
-  if(id==="kpi"&&!has("kpi_view")){
-    toast("B2C KPI는 관리자만 볼 수 있습니다.");
-    return;
-  }
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   $(`${id}Page`)?.classList.add("active");
-  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")||(["transport","vehicles","forklift"].includes(id)&&b.dataset.page==="transport")));
   $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
   if(id==="permissions") renderPermissions();
 }
@@ -751,6 +752,7 @@ function renderMessengerRooms(){
     btn.onclick=()=>selectMessengerRoom(btn.dataset.roomId);
   });
   updateMessengerHeader();
+  updateMenuBadges();
 }
 function updateMessengerHeader(){
   const room=currentMessengerRoom();
@@ -1210,15 +1212,14 @@ async function changePassword(){
 function renderDashboard(){
   const now=new Date(), ym=now.toISOString().slice(0,7);
   const monthCards=state.cards.filter(x=>String(x.used_date||"").startsWith(ym));
-  $("cardTotal").textContent=money(monthCards.reduce((a,x)=>a+Number(x.amount||0),0));
-  $("cardCount").textContent=`${monthCards.length}건`;
+  renderDashboardCardOwners(monthCards);
   $("missingReceipt").textContent=`${monthCards.filter(x=>x.receipt_status==="미첨부").length}건`;
   const lunch=todayLunchStats(isoDateOffset(1));
   $("lunchTotal").textContent=`${lunch.total}명`;
   $("lunchBreakdown").textContent=`직원 ${lunch.internal}명 + 외주 ${lunch.externalMeals}명`;
   const purchasePending=getDashboardPurchaseItems();
   $("pendingPurchase").textContent=`${purchasePending.length}건`;
-  $("privatePending").textContent=`${state.privateMessages.filter(x=>!x.is_answered).length}건`; $("kpiDone").textContent="0명";
+  $("privatePending").textContent=`${state.privateMessages.filter(x=>!x.is_answered).length}건`;
   renderDashboardPurchases();
   renderCardChart(); renderRecentCards();
   $("recentNotices").innerHTML=state.notices.slice(0,5).map(n=>`<div class="list-item"><b>${escapeHtml(n.title)}</b><small>${new Date(n.created_at).toLocaleDateString("ko-KR")}</small></div>`).join("")||`<div class="empty">공지 없음</div>`;
@@ -1235,10 +1236,19 @@ function renderDashboard(){
   `;
 
   renderDashboardSchedule();
-  const kpiShortcut=$("dashboardKpiShortcut");
-  if(kpiShortcut)kpiShortcut.classList.toggle("hidden",!has("kpi_view"));
 }
 
+
+function renderDashboardCardOwners(monthCards){
+  const holders=["손동오","이찬규","신태선","엄수현"];
+  const box=$("dashboardCardOwners");
+  if(!box)return;
+  box.innerHTML=holders.map(name=>{
+    const rows=monthCards.filter(x=>String(x.card_owner||"").replace(/\s/g,"").includes(name));
+    const total=rows.reduce((a,x)=>a+Number(x.amount||0),0);
+    return `<article class="metric card-owner-metric"><span>${escapeHtml(name)} 법인카드</span><b>${money(total)}</b><small>${rows.length}건</small></article>`;
+  }).join("");
+}
 
 function selectedContractorDate(){
   return $("contractorWorkDate")?.value||new Date().toISOString().slice(0,10);
@@ -1347,7 +1357,7 @@ window.deleteContractor=async function(id){
 
 function getDashboardPurchaseItems(){
   const all=state.purchaseRequests||[];
-  if(isFinalPurchaseApprover()) return all.filter(x=>x.status==="review_complete");
+  if(isFinalPurchaseApprover()) return all.filter(x=>!["completed","rejected"].includes(x.status));
   if(isPurchaseManager()) return all.filter(x=>["requested","reviewing","approved","ordered","received"].includes(x.status));
   const myId=state.user?.id;
   return all.filter(x=>x.requester_id===myId && !["completed","rejected"].includes(x.status));
@@ -1362,7 +1372,7 @@ function renderDashboardPurchases(){
   const title=$("dashboardPurchaseTitle"), guide=$("dashboardPurchaseGuide");
   if(isFinalPurchaseApprover()){
     title.textContent="구매 최종 승인 대기";
-    guide.textContent="김헌정 검토가 끝난 구매 신청입니다. 승인 또는 반려가 필요합니다.";
+    guide.textContent="모든 구매 신청을 확인하고 검토중이어도 결재·반려·완료 처리할 수 있습니다.";
   }else if(isPurchaseManager()){
     title.textContent="구매 처리 업무";
     guide.textContent="신청 검토부터 발주·입고·구매완료까지 처리할 항목입니다.";
@@ -1751,6 +1761,11 @@ function getOrganizationPeople(){
     }
   });
 
+  people.forEach(p=>{
+    if(p.name==="김헌정"){p.team="발주팀";p.position="주임"}
+    if(p.name==="성경진"){p.team="B2C";p.position="대리"}
+    if(p.name==="정해림"){p.team="B2C";p.position="차장";p.on_leave=true}
+  });
   return people;
 }
 function positionRank(position){
@@ -1783,7 +1798,7 @@ function getTeamLeader(teamName,members){
     "발주팀":"장수범",
     "국내팀":"이찬규",
     "해외팀":"김일신",
-    "B2C":"정해림"
+    "B2C":"성경진"
   };
   const fixedName=fixedLeaders[teamName];
   return members.find(p=>p.name===fixedName)
@@ -1865,7 +1880,7 @@ function renderOrg(){
       <div class="org-team-leader" ${leader?`onclick="openOrgPerson('${escapeHtml(leader.emp_no)}')"`:""}>
         ${leader?`
           <div class="leader-badge">팀장</div>
-          <div class="leader-name">${escapeHtml(leader.name)}</div>
+          <div class="leader-name">${escapeHtml(leader.name)} ${leader.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</div>
           <div class="leader-position">${escapeHtml(/팀장/.test(String(leader.position||""))?leader.position:"팀장")}</div>
           ${state.orgEditMode?`<button class="btn small" onclick="selectOrgPerson('${escapeHtml(leader.emp_no)}')">수정</button>`:""}
         `:`<div class="empty compact-empty">팀장 미지정</div>`}
@@ -1877,7 +1892,7 @@ function renderOrg(){
       const statusClass=member.pending_approval?"pending":member.move_planned?"moving":"";
       html+=`<div class="org-member ${statusClass}" onclick="openOrgPerson('${escapeHtml(member.emp_no)}')">
         <div class="org-member-main">
-          <span class="org-member-name">${escapeHtml(member.name)}</span>
+          <span class="org-member-name">${escapeHtml(member.name)} ${member.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</span>
           <span class="org-member-position">${escapeHtml(member.position||"사원")}</span>
         </div>
         ${state.orgEditMode?`<button class="btn small" onclick="selectOrgPerson('${escapeHtml(member.emp_no)}')">수정</button>`:""}
@@ -2891,12 +2906,14 @@ async function loadBusinessTrips(){
 function tripTypeLabel(v){return v==="overseas_trip"?"해외출장":"국내출장"}
 function transportVehicles(){return (state.vehicles||[]).filter(v=>(v.vehicle_group||"")==="transport")}
 function renderTripEmployeeOptions(){
-  const el=$("businessTripEmployees"); if(!el)return;
-  const old=[...el.selectedOptions].map(o=>o.value);
-  el.innerHTML=(state.employees||[]).filter(e=>e.is_active!==false).map(e=>`<option value="${e.id}">${escapeHtml(e.name)} · ${escapeHtml(e.team||"")} · ${escapeHtml(e.position||"")}</option>`).join("");
-  [...el.options].forEach(o=>o.selected=old.includes(o.value));
-  const vs=$("businessTripVehicle"); if(vs){const v=vs.value;vs.innerHTML=`<option value="">차량 미사용</option>`+state.vehicles.map(x=>`<option value="${x.id}">${escapeHtml(x.vehicle_number||"")} · ${escapeHtml(x.vehicle_name||"")}</option>`).join("");vs.value=v;}
+  const list=$("businessTripEmployeeList");if(!list)return;
+  list.innerHTML=(state.employees||[]).filter(e=>e.is_active!==false).map(e=>`<option value="${escapeHtml(e.name)}">${escapeHtml(e.team||"")} · ${escapeHtml(e.position||"")}</option>`).join("");
+  renderTripEmployeeTags();
+  const vs=$("businessTripVehicle");if(vs){const v=vs.value;vs.innerHTML=`<option value="">차량 미사용</option>`+state.vehicles.map(x=>`<option value="${x.id}">${escapeHtml(x.vehicle_number||"")} · ${escapeHtml(x.vehicle_name||"")}</option>`).join("");vs.value=v;}
 }
+function addTripEmployeeName(name){name=String(name||"").trim();if(!name)return;const person=(state.employees||[]).find(x=>x.name===name&&x.is_active!==false);if(!person){toast("직원 이름을 정확히 입력하세요.");return}if(!state.tripEmployeeNames.includes(name))state.tripEmployeeNames.push(name);$("businessTripEmployeeInput").value="";renderTripEmployeeTags()}
+function renderTripEmployeeTags(){const box=$("businessTripEmployeeTags");if(!box)return;box.innerHTML=state.tripEmployeeNames.map(n=>`<span class="employee-tag">${escapeHtml(n)}<button type="button" onclick="removeTripEmployeeName('${escapeHtml(n)}')">×</button></span>`).join("")||`<small>출장자 이름을 입력하고 Enter를 누르세요.</small>`}
+window.removeTripEmployeeName=function(name){state.tripEmployeeNames=state.tripEmployeeNames.filter(n=>n!==name);renderTripEmployeeTags()}
 function businessTripEmployeeNames(x){return Array.isArray(x.employee_names)?x.employee_names.join(", "):(x.employee_names||"")}
 function renderBusinessTrips(){
   if(!$("businessTripTable"))return;
@@ -2908,7 +2925,7 @@ function renderBusinessTrips(){
   ]));
 }
 async function saveBusinessTrip(){
-  const employees=[...$("businessTripEmployees").selectedOptions].map(o=>({id:o.value,name:o.textContent.split(" · ")[0]}));
+  const employees=state.tripEmployeeNames.map(name=>{const e=(state.employees||[]).find(x=>x.name===name);return e?{id:e.id,name:e.name}:null}).filter(Boolean);
   const start=$("businessTripStart").value,end=$("businessTripEnd").value||start,vehicleId=$("businessTripVehicle").value||null;
   if(!employees.length||!start){toast("출장자와 시작일을 선택하세요.");return}
   if(end<start){toast("종료일을 확인하세요.");return}
@@ -2925,9 +2942,11 @@ async function saveBusinessTrip(){
   if(calError){await supabaseClient.from("business_trips").delete().eq("id",data.id);toast("출장 달력 연동 실패: "+calError.message);return}
   await Promise.all([loadBusinessTrips(),loadCalendarEntries()]);renderBusinessTrips();renderCalendar();renderDashboard();clearBusinessTrip();toast("출장을 등록했습니다. 출장 기간 식사 인원에서 자동 제외됩니다.");
 }
-function clearBusinessTrip(){["businessTripDestination","businessTripPurpose","businessTripDriver","businessTripMemo"].forEach(id=>{if($(id))$(id).value=""});if($("businessTripEmployees"))[...$("businessTripEmployees").options].forEach(o=>o.selected=false);if($("businessTripVehicle"))$("businessTripVehicle").value="";if($("businessTripStart"))$("businessTripStart").value=isoDateOffset(0);if($("businessTripEnd"))$("businessTripEnd").value=isoDateOffset(0);}
+function clearBusinessTrip(){["businessTripDestination","businessTripPurpose","businessTripDriver","businessTripMemo"].forEach(id=>{if($(id))$(id).value=""});state.tripEmployeeNames=[];renderTripEmployeeTags();if($("businessTripVehicle"))$("businessTripVehicle").value="";if($("businessTripStart"))$("businessTripStart").value=isoDateOffset(0);if($("businessTripEnd"))$("businessTripEnd").value=isoDateOffset(0);}
 window.deleteBusinessTrip=async id=>{if(!confirm("이 출장을 삭제할까요? 달력의 출장 일정도 함께 삭제됩니다."))return;await supabaseClient.from("work_calendar_entries").delete().eq("business_trip_id",id);const {error}=await supabaseClient.from("business_trips").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}await Promise.all([loadBusinessTrips(),loadCalendarEntries()]);renderBusinessTrips();renderCalendar();renderDashboard();toast("출장을 삭제했습니다.")}
 
+function switchAssetTab(page){goPage(page)}
+window.switchAssetTab=switchAssetTab;
 function renderTransport(){
   if(!$("transportVehicleCards"))return;
   const vehicles=transportVehicles();
@@ -2950,7 +2969,9 @@ async function loadVehicleMaintenance(){const {data,error}=await supabaseClient.
 async function loadForkliftAssets(){const {data,error}=await supabaseClient.from("forklift_assets").select("*").order("location").order("asset_name");if(error){console.warn("forklift_assets load",error);state.forkliftAssets=[];return}state.forkliftAssets=data||[]}
 async function loadForkliftMaintenance(){const {data,error}=await supabaseClient.from("forklift_maintenance").select("*").order("maintenance_date",{ascending:false}).limit(1000);if(error){console.warn("forklift_maintenance load",error);state.forkliftMaintenance=[];return}state.forkliftMaintenance=data||[]}
 
-function renderCompanyEvents(){if(!$("companyEventTable"))return;const month=$("eventMonthFilter").value||isoDateOffset(0).slice(0,7);const rows=state.companyEvents.filter(x=>String(x.start_date).startsWith(month));$("companyEventTable").innerHTML=tableHtml(["구분","행사명","기간","시간","담당","인원","장소","관리"],rows.map(x=>[eventTypeLabel(x.event_type),x.title,`${x.start_date}${x.end_date!==x.start_date?` ~ ${x.end_date}`:""}`,x.event_time||"",x.manager_name||"",`${x.participant_count||0}명`,x.location||"",has("calendar_manage")?`<button class="btn small danger" onclick="deleteCompanyEvent('${x.id}')">삭제</button>`:""]));const today=isoDateOffset(0);$("eventUpcomingList").innerHTML=state.companyEvents.filter(x=>x.end_date>=today).slice(0,8).map(x=>`<div class="list-item"><b>${eventTypeLabel(x.event_type)} · ${escapeHtml(x.title)}</b><small>${x.start_date} ${escapeHtml(x.event_time||"")} · ${escapeHtml(x.location||"")}</small></div>`).join("")||`<div class="empty">예정된 일정이 없습니다.</div>`}
+function eventStatus(x){const today=isoDateOffset(0);if(today<x.start_date)return "예정";if(today>x.end_date)return "종료";return "진행중"}
+function eventStatusBadge(x){const st=eventStatus(x);return `<span class="event-status ${st==="진행중"?"active":st==="예정"?"upcoming":"ended"}">${st}</span>`}
+function renderCompanyEvents(){if(!$("companyEventTable"))return;const month=$("eventMonthFilter").value||isoDateOffset(0).slice(0,7);const rows=state.companyEvents.filter(x=>String(x.start_date).startsWith(month));$("companyEventTable").innerHTML=tableHtml(["상태","구분","행사명","기간","시간","담당","인원","장소","관리"],rows.map(x=>[eventStatusBadge(x),eventTypeLabel(x.event_type),x.title,`${x.start_date}${x.end_date!==x.start_date?` ~ ${x.end_date}`:""}`,x.event_time||"",x.manager_name||"",`${x.participant_count||0}명`,x.location||"",has("calendar_manage")?`<button class="btn small danger" onclick="deleteCompanyEvent('${x.id}')">삭제</button>`:""]));const today=isoDateOffset(0);$("eventUpcomingList").innerHTML=state.companyEvents.filter(x=>x.end_date>=today).slice(0,8).map(x=>`<div class="list-item"><b>${eventStatusBadge(x)} ${eventTypeLabel(x.event_type)} · ${escapeHtml(x.title)}</b><small>${x.start_date} ${escapeHtml(x.event_time||"")} · ${escapeHtml(x.location||"")}</small></div>`).join("")||`<div class="empty">예정된 일정이 없습니다.</div>`}
 function eventTypeLabel(t){return ({b2c:"B2C 행사",company:"회사 일정",education:"교육",cleanup:"창고 정리",dinner:"회식",other:"기타"})[t]||t}
 async function saveCompanyEvent(){if(!has("calendar_manage")){toast("달력 관리자만 등록할 수 있습니다.");return}const row={event_type:$("eventType").value,title:$("eventTitle").value.trim(),start_date:$("eventStartDate").value,end_date:$("eventEndDate").value||$("eventStartDate").value,event_time:$("eventTime").value.trim(),manager_name:$("eventManager").value.trim(),participant_count:Number($("eventParticipants").value||0),location:$("eventLocation").value.trim(),memo:$("eventMemo").value.trim(),created_by:state.user.id};if(!row.title||!row.start_date){toast("행사명과 시작일을 입력하세요.");return}const {error}=await supabaseClient.from("company_events").insert(row);if(error){toast("일정 저장 실패: "+error.message);return}await loadCompanyEvents();clearCompanyEvent();renderCompanyEvents();renderCalendar();renderDashboard();toast("회사 일정을 저장했습니다.")}
 function clearCompanyEvent(){["eventTitle","eventTime","eventManager","eventLocation","eventMemo"].forEach(id=>$(id).value="");$("eventParticipants").value=0;$("eventStartDate").value=isoDateOffset(0);$("eventEndDate").value=isoDateOffset(0)}
@@ -3076,15 +3097,17 @@ function activateVehicleTab(tab){document.querySelectorAll(".vehicle-tab").forEa
 
 function forkliftLabel(id){const x=state.forkliftAssets.find(v=>String(v.id)===String(id));return x?`${x.location} · ${x.asset_name}`:"지게차"}
 function clearForklift(){state.editingForkliftId=null;["forkliftName","forkliftLocation","forkliftManager","forkliftMemo"].forEach(id=>{if($(id))$(id).value=""});if($("forkliftHours"))$("forkliftHours").value=0;if($("forkliftStatus"))$("forkliftStatus").value="사용중"}
-async function saveForklift(){const row={asset_name:$("forkliftName").value.trim(),location:$("forkliftLocation").value,manager_name:$("forkliftManager").value.trim(),current_hours:Number($("forkliftHours").value||0),status:$("forkliftStatus").value,memo:$("forkliftMemo").value.trim(),updated_at:new Date().toISOString()};if(!row.asset_name||!row.location||!row.manager_name){toast("지게차명, 위치, 담당자를 입력하세요.");return}let error;if(state.editingForkliftId)({error}=await supabaseClient.from("forklift_assets").update(row).eq("id",state.editingForkliftId));else({error}=await supabaseClient.from("forklift_assets").insert(row));if(error){toast("지게차 저장 실패: "+error.message);return}await loadForkliftAssets();clearForklift();renderForklifts();toast("지게차 정보를 저장했습니다.")}
-window.editForklift=id=>{const x=state.forkliftAssets.find(v=>String(v.id)===String(id));if(!x)return;state.editingForkliftId=id;$("forkliftName").value=x.asset_name||"";$("forkliftLocation").value=x.location||"종합물류";$("forkliftManager").value=x.manager_name||"";$("forkliftHours").value=x.current_hours||0;$("forkliftStatus").value=x.status||"사용중";$("forkliftMemo").value=x.memo||""}
+async function saveForklift(){const row={asset_name:$("forkliftName").value.trim(),equipment_type:$("forkliftType").value,location:$("forkliftLocation").value,manager_name:$("forkliftManager").value.trim(),current_hours:Number($("forkliftHours").value||0),status:$("forkliftStatus").value,memo:$("forkliftMemo").value.trim(),updated_at:new Date().toISOString()};if(!row.asset_name||!row.location||!row.manager_name){toast("지게차명, 위치, 담당자를 입력하세요.");return}let error;if(state.editingForkliftId)({error}=await supabaseClient.from("forklift_assets").update(row).eq("id",state.editingForkliftId));else({error}=await supabaseClient.from("forklift_assets").insert(row));if(error){toast("지게차 저장 실패: "+error.message);return}await loadForkliftAssets();clearForklift();renderForklifts();toast("지게차 정보를 저장했습니다.")}
+window.editForklift=id=>{const x=state.forkliftAssets.find(v=>String(v.id)===String(id));if(!x)return;state.editingForkliftId=id;$("forkliftName").value=x.asset_name||"";$("forkliftType").value=x.equipment_type||"전동";$("forkliftLocation").value=x.location||"종합물류";$("forkliftManager").value=x.manager_name||"";$("forkliftHours").value=x.current_hours||0;$("forkliftStatus").value=x.status||"사용중";$("forkliftMemo").value=x.memo||""}
 function clearForkliftMaintenance(){state.editingForkliftMaintenanceId=null;["forkliftMaintenanceDate","forkliftMaintenanceShop","forkliftMaintenanceMemo","forkliftMaintenanceNextDate"].forEach(id=>{if($(id))$(id).value=""});if($("forkliftMaintenanceHours"))$("forkliftMaintenanceHours").value=0;if($("forkliftMaintenanceCost"))$("forkliftMaintenanceCost").value=0;if($("forkliftMaintenanceNextHours"))$("forkliftMaintenanceNextHours").value=0}
 async function saveForkliftMaintenance(){const row={forklift_id:$("forkliftMaintenanceAsset").value,maintenance_date:$("forkliftMaintenanceDate").value,maintenance_type:$("forkliftMaintenanceType").value,operating_hours:Number($("forkliftMaintenanceHours").value||0),shop_name:$("forkliftMaintenanceShop").value.trim(),cost:Number($("forkliftMaintenanceCost").value||0),next_due_date:$("forkliftMaintenanceNextDate").value||null,next_due_hours:Number($("forkliftMaintenanceNextHours").value||0)||null,memo:$("forkliftMaintenanceMemo").value.trim(),reported_by:state.user.id,reported_by_name:state.profile?.name||"",workflow_status:"reported",updated_at:new Date().toISOString()};if(!row.forklift_id||!row.maintenance_date){toast("지게차와 작업일을 입력하세요.");return}let error;if(state.editingForkliftMaintenanceId)({error}=await supabaseClient.from("forklift_maintenance").update(row).eq("id",state.editingForkliftMaintenanceId));else({error}=await supabaseClient.from("forklift_maintenance").insert(row));if(error){toast("지게차 정비 보고 실패: "+error.message);return}if(row.maintenance_type==="증류수 보충")await supabaseClient.from("forklift_assets").update({last_distilled_water_date:row.maintenance_date,current_hours:row.operating_hours,updated_at:new Date().toISOString()}).eq("id",row.forklift_id);else await supabaseClient.from("forklift_assets").update({current_hours:row.operating_hours,updated_at:new Date().toISOString()}).eq("id",row.forklift_id);await Promise.all([loadForkliftAssets(),loadForkliftMaintenance()]);clearForkliftMaintenance();renderForklifts();renderPendingWorkAlerts(true);toast("지게차 작업 보고가 등록되었습니다. 김헌정 주임에게 금액 확인 알림이 전달됩니다.")}
 window.editForkliftMaintenance=id=>{const x=state.forkliftMaintenance.find(v=>String(v.id)===String(id));if(!x)return;state.editingForkliftMaintenanceId=id;$("forkliftMaintenanceAsset").value=x.forklift_id;$("forkliftMaintenanceDate").value=x.maintenance_date;$("forkliftMaintenanceType").value=x.maintenance_type;$("forkliftMaintenanceHours").value=x.operating_hours||0;$("forkliftMaintenanceShop").value=x.shop_name||"";$("forkliftMaintenanceCost").value=x.cost||0;$("forkliftMaintenanceNextDate").value=x.next_due_date||"";$("forkliftMaintenanceNextHours").value=x.next_due_hours||0;$("forkliftMaintenanceMemo").value=x.memo||""}
 function forkliftMaintenanceActions(x){const a=[];if(currentUserIs("김헌정")&&(x.workflow_status||"reported")==="reported")a.push(`<button class="btn small primary" onclick="checkMaintenanceAmount('forklift','${x.id}')">금액 확인</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="amount_checked"){a.push(`<button class="btn small primary" onclick="approveMaintenance('forklift','${x.id}',true)">결재</button>`);a.push(`<button class="btn small danger" onclick="approveMaintenance('forklift','${x.id}',false)">반려</button>`)}if(x.reported_by===state.user.id||has("vehicles_manage"))a.push(`<button class="btn small" onclick="editForkliftMaintenance('${x.id}')">수정</button>`);return a.join(" ")||"-"}
-function renderForklifts(){if(!$("forkliftAssetCards"))return;const opts=state.forkliftAssets.map(x=>`<option value="${x.id}">${escapeHtml(x.location)} · ${escapeHtml(x.asset_name)}</option>`).join("");$("forkliftMaintenanceAsset").innerHTML=opts;$("forkliftAssetCards").innerHTML=state.forkliftAssets.map(x=>`<article class="vehicle-card"><div class="vehicle-card-head"><b>${escapeHtml(x.location)} · ${escapeHtml(x.asset_name)}</b><span class="badge">${escapeHtml(x.status||"사용중")}</span></div><small>담당 ${escapeHtml(x.manager_name||"-")}</small><div class="vehicle-card-metrics"><span>가동 ${Number(x.current_hours||0).toLocaleString()}시간</span><span>증류수 ${escapeHtml(x.last_distilled_water_date||"미등록")}</span></div><button class="btn small" onclick="editForklift('${x.id}')">수정</button></article>`).join("")||`<div class="empty">등록된 지게차가 없습니다.</div>`;$("forkliftMaintenanceTable").innerHTML=tableHtml(["작업일","지게차","항목","가동시간","증류수 보충일","업체","금액","다음 기준","상태","처리정보","관리"],state.forkliftMaintenance.map(x=>{const a=state.forkliftAssets.find(v=>String(v.id)===String(x.forklift_id));return[x.maintenance_date,forkliftLabel(x.forklift_id),x.maintenance_type,`${Number(x.operating_hours||0).toLocaleString()}시간`,x.maintenance_type==="증류수 보충"?x.maintenance_date:(a?.last_distilled_water_date||"-"),x.shop_name||"",money(x.cost),x.next_due_date||((x.next_due_hours||"")+"시간"),vehicleWorkflowLabel(x.workflow_status),`보고 ${x.reported_by_name||"-"}<br>금액확인 ${x.amount_checked_by_name||"-"}<br>결재 ${x.approved_by_name||"-"}`,forkliftMaintenanceActions(x)]}))}
+window.deleteForklift=async function(id){if(!has("vehicles_manage")){toast("관리자만 삭제할 수 있습니다.");return}if(!confirm("이 지게차를 삭제할까요?"))return;const {error}=await supabaseClient.from("forklift_assets").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}await loadForkliftAssets();renderForklifts();toast("지게차를 삭제했습니다.")}
+function forkliftCard(x){const electric=(x.equipment_type||"전동")==="전동";return `<article class="vehicle-card"><div class="vehicle-card-head"><b>${escapeHtml(x.asset_name)}</b><span class="badge">${escapeHtml(x.equipment_type||"전동")}</span></div><small>담당 ${escapeHtml(x.manager_name||"-")}</small><div class="vehicle-card-metrics"><span>가동 ${Number(x.current_hours||0).toLocaleString()}시간</span><span>${electric?`증류수 ${escapeHtml(x.last_distilled_water_date||"미등록")}`:"디젤 정비대상"}</span></div><div class="inline-actions"><button class="btn small" onclick="editForklift('${x.id}')">수정</button>${has("vehicles_manage")?`<button class="btn small danger" onclick="deleteForklift('${x.id}')">삭제</button>`:""}</div></article>`}
+function renderForklifts(){if(!$("forkliftAssetCards"))return;const opts=state.forkliftAssets.map(x=>`<option value="${x.id}">${escapeHtml(x.location)} · ${escapeHtml(x.asset_name)}</option>`).join("");$("forkliftMaintenanceAsset").innerHTML=opts;const locations=["종합물류","3물류"];$("forkliftAssetCards").innerHTML=locations.map(loc=>{const rows=state.forkliftAssets.filter(x=>x.location===loc);const electric=rows.filter(x=>(x.equipment_type||"전동")==="전동");const diesel=rows.filter(x=>x.equipment_type==="디젤");return `<section class="forklift-location"><h3>${loc}</h3><h4>전동지게차 (${electric.length}대)</h4><div class="vehicle-card-grid">${electric.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div><h4>디젤지게차 (${diesel.length}대)</h4><div class="vehicle-card-grid">${diesel.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div></section>`}).join("");$("forkliftMaintenanceTable").innerHTML=tableHtml(["작업일","지게차","항목","가동시간","증류수 보충일","업체","금액","다음 기준","상태","처리정보","관리"],state.forkliftMaintenance.map(x=>{const a=state.forkliftAssets.find(v=>String(v.id)===String(x.forklift_id));return[x.maintenance_date,forkliftLabel(x.forklift_id),x.maintenance_type,`${Number(x.operating_hours||0).toLocaleString()}시간`,x.maintenance_type==="증류수 보충"?x.maintenance_date:(a?.last_distilled_water_date||"-"),x.shop_name||"",money(x.cost),x.next_due_date||((x.next_due_hours||"")+"시간"),vehicleWorkflowLabel(x.workflow_status),`보고 ${x.reported_by_name||"-"}<br>금액확인 ${x.amount_checked_by_name||"-"}<br>결재 ${x.approved_by_name||"-"}`,forkliftMaintenanceActions(x)]}))}
 
-function renderDashboardSchedule(){if(!$("dashboardScheduleList"))return;const today=isoDateOffset(0),tomorrow=isoDateOffset(1);let items=[];state.companyEvents.filter(x=>x.start_date<=tomorrow&&x.end_date>=today).forEach(x=>items.push({d:x.start_date,label:`${eventTypeLabel(x.event_type)} · ${x.title}`,meta:`${x.event_time||""} ${x.location||""}`}));state.meetingBookings.filter(x=>x.meeting_date>=today&&x.meeting_date<=tomorrow).forEach(x=>items.push({d:x.meeting_date,label:`회의 · ${x.title}`,meta:`${String(x.start_time).slice(0,5)} ${x.meeting_with||""}`}));items.sort((a,b)=>a.d.localeCompare(b.d));$("dashboardScheduleList").innerHTML=items.map(x=>`<div class="list-item"><b>${x.d===today?"오늘":"내일"} · ${escapeHtml(x.label)}</b><small>${escapeHtml(x.meta)}</small></div>`).join("")||`<div class="empty">오늘·내일 일정이 없습니다.</div>`}
+function renderDashboardSchedule(){if(!$("dashboardScheduleList"))return;const today=isoDateOffset(0),tomorrow=isoDateOffset(1);let items=[];state.companyEvents.filter(x=>x.start_date<=tomorrow&&x.end_date>=today).forEach(x=>items.push({d:x.start_date,label:`${eventStatus(x)} · ${eventTypeLabel(x.event_type)} · ${x.title}`,meta:`${x.event_time||""} ${x.location||""}`}));state.meetingBookings.filter(x=>x.meeting_date>=today&&x.meeting_date<=tomorrow).forEach(x=>items.push({d:x.meeting_date,label:`회의 · ${x.title}`,meta:`${String(x.start_time).slice(0,5)} ${x.meeting_with||""}`}));items.sort((a,b)=>a.d.localeCompare(b.d));$("dashboardScheduleList").innerHTML=items.map(x=>`<div class="list-item"><b>${x.d===today?"오늘":"내일"} · ${escapeHtml(x.label)}</b><small>${escapeHtml(x.meta)}</small></div>`).join("")||`<div class="empty">오늘·내일 일정이 없습니다.</div>`}
 
 window.openOrgPerson=function(empNo){
   const e=(state.employees||[]).find(x=>String(x.emp_no)===String(empNo));
@@ -3133,6 +3156,8 @@ window.saveMyOrgContact=async function(){
 $("closeOrgPersonModalBtn").onclick=()=>$("orgPersonModal").classList.add("hidden");
 $("saveCompanyEventBtn").onclick=saveCompanyEvent;$("clearCompanyEventBtn").onclick=clearCompanyEvent;$("eventMonthFilter").onchange=renderCompanyEvents;
 $("saveMeetingBtn").onclick=saveMeeting;$("clearMeetingBtn").onclick=clearMeeting;$("meetingMonthFilter").onchange=renderMeetings;
+
+if($("businessTripEmployeeInput"))$("businessTripEmployeeInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addTripEmployeeName(e.target.value)}});
 $("saveBusinessTripBtn").onclick=saveBusinessTrip;$("clearBusinessTripBtn").onclick=clearBusinessTrip;$("businessTripMonth").onchange=renderBusinessTrips;
 $("saveTransportVehicleBtn").onclick=saveTransportVehicle;$("saveTransportMaintenanceBtn").onclick=saveTransportMaintenance;
 $("saveVehicleBtn").onclick=saveVehicle;$("clearVehicleBtn").onclick=clearVehicle;$("deleteVehicleBtn").onclick=deleteSelectedVehicle;
@@ -3144,11 +3169,6 @@ $("tripVehicle").onchange=e=>{state.selectedVehicleId=e.target.value;renderVehic
 document.querySelectorAll(".vehicle-tab").forEach(b=>b.onclick=()=>activateVehicleTab(b.dataset.vtab));
 
 $("changePasswordBtn").onclick=changePassword;
-$("reloadKpiBtn").onclick=()=>{$("kpiFrame").src="kpi.html?reload="+Date.now();toast("KPI 화면을 새로고침했습니다.");};
-$("reloadB2bBtn").onclick=()=>{
-  $("b2bFrame").src="b2b.html?reload="+Date.now();
-  toast("B2B 작업통계를 새로고침했습니다.");
-};
 
 $("toggleOrgEditBtn").onclick=toggleOrgEdit;
 $("addOrgTeamBtn").onclick=addOrgTeam;

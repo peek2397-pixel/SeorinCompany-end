@@ -56,19 +56,14 @@
 
       <section id="dashboardPage" class="page active">
         <div class="metric-grid">
-          <article class="metric"><span>이번 달 법인카드</span><b id="cardTotal">0원</b><small id="cardCount">0건</small></article>
+          <div id="dashboardCardOwners" class="dashboard-card-owners"></div>
           <article class="metric"><span>증빙 미첨부</span><b id="missingReceipt">0건</b><small>확인 필요</small></article>
           <article class="metric meal-metric"><span>내일 점심 식사 인원</span><b id="lunchTotal">0명</b><small id="lunchBreakdown">직원 0명 + 외주 0명</small></article>
           <article class="metric"><span>구매 승인 대기</span><b id="pendingPurchase">0건</b><small>처리 필요</small></article>
           <article class="metric"><span>미답변 비밀소통</span><b id="privatePending">0건</b><small>권한자만 표시</small></article>
-          <article class="metric"><span>KPI 평가 완료</span><b id="kpiDone">0명</b><small>직원에게 점수 비공개</small></article>
+
         </div>
 
-        <div id="dashboardKpiShortcut" class="dashboard-kpi-shortcut">
-          <div>
-            <b>KPI 관리</b>
-            <span>개인 일일수량 · 지원분배 · 공동작업 · 월별평가 · 기간평가</span>
-          </div>
           <button class="btn primary" onclick="goPage('kpi')">KPI 바로가기</button>
         </div>
 
@@ -635,7 +630,7 @@
             <div class="panel-head"><div><h3>출장 등록</h3><small>출장 등록 시 근무·휴무 달력에 표시되고 출장기간 점심 식사 인원에서 자동 제외됩니다.</small></div></div>
             <div class="form-grid">
               <label>출장 구분<select id="businessTripType"><option value="domestic_trip">국내출장</option><option value="overseas_trip">해외출장</option></select></label>
-              <label>출장자<select id="businessTripEmployees" multiple size="6"></select><small>여러 명은 Ctrl 키를 누르고 선택</small></label>
+              <label>출장자 이름<input id="businessTripEmployeeInput" list="businessTripEmployeeList" placeholder="이름 입력 후 Enter" /><datalist id="businessTripEmployeeList"></datalist><div id="businessTripEmployeeTags" class="employee-tags"></div></label>
               <label>시작일<input id="businessTripStart" type="date" /></label><label>종료일<input id="businessTripEnd" type="date" /></label>
               <label>출장 지역<input id="businessTripDestination" placeholder="예: 서울 / 일본 도쿄" /></label><label>출장 목적<input id="businessTripPurpose" /></label>
               <label>출장 차량<select id="businessTripVehicle"><option value="">차량 미사용</option></select></label><label>운전자<input id="businessTripDriver" /></label>
@@ -649,7 +644,7 @@
         <div class="panel"><div class="panel-head"><h3>출장 내역</h3><input id="businessTripMonth" type="month" /></div><div id="businessTripTable"></div></div>
       </section>
 
-      <section id="transportPage" class="page">
+      <section id="transportPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
         <div class="panel vehicle-top-panel">
           <div class="panel-head">
             <div><h3>운송팀 차량관리</h3><small>기존 차량관리와 같은 방식으로 실제 차량번호를 등록하고 카드에서 선택해 수정합니다.</small></div>
@@ -684,7 +679,7 @@
         <div class="panel"><div class="panel-head"><h3>운송팀 정비 결재 현황</h3></div><div id="transportMaintenanceTable"></div></div>
       </section>
 
-      <section id="vehiclesPage" class="page">
+      <section id="vehiclesPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
         <div class="panel vehicle-top-panel">
           <div class="panel-head">
             <div>
@@ -771,13 +766,13 @@
 
       </section>
 
-        <section id="forkliftPage" class="page">
+        <section id="forkliftPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
         <div class="panel"><div class="panel-head"><div><h3>지게차관리</h3><small>종합물류·3물류 지게차의 증류수 보충일, 가동시간, 엔진오일·타이어·부품 교환을 별도로 관리합니다.</small></div></div></div>
           <div class="content-grid">
             <article class="panel">
               <div class="panel-head"><div><h3>지게차 등록·수정</h3><small>종합물류 이형기 대리 / 3물류 구강석 대리</small></div></div>
               <div class="form-grid">
-                <label>지게차명<input id="forkliftName" placeholder="예: 전동지게차 1호" /></label>
+                <label>지게차명<input id="forkliftName" placeholder="예: 전동지게차 A" /></label><label>구분<select id="forkliftType"><option>전동</option><option>디젤</option></select></label>
                 <label>위치<select id="forkliftLocation"><option>종합물류</option><option>3물류</option></select></label>
                 <label>담당자<input id="forkliftManager" placeholder="이형기 또는 구강석" /></label>
                 <label>현재 가동시간<input id="forkliftHours" type="number" min="0" /></label>
@@ -786,7 +781,7 @@
               </div>
               <div class="actions"><button id="saveForkliftBtn" class="btn primary">지게차 저장</button><button id="clearForkliftBtn" class="btn">초기화</button></div>
             </article>
-            <article class="panel"><div class="panel-head"><h3>지게차 현황</h3></div><div id="forkliftAssetCards" class="vehicle-card-grid"></div></article>
+            <article class="panel span-2"><div class="panel-head"><h3>지게차 현황</h3></div><div id="forkliftAssetCards" class="forklift-split"></div></article>
           </div>
           <article class="panel">
             <div class="panel-head"><div><h3>지게차 증류수·정비·부품 보고</h3><small>담당자 보고 → 김헌정 주임 금액 확인 → 손동오 관리자 최종 결재</small></div></div>
@@ -803,6 +798,14 @@
           </article>
         </section>
 
+
+      <section id="dinnerPage" class="page">
+        <div class="content-grid">
+          <article class="panel"><div class="panel-head"><h3>오늘 회식 메뉴</h3></div><div class="game-result" id="dinnerMenuResult">버튼을 눌러 메뉴를 추천받으세요.</div><button class="btn primary" onclick="pickDinnerMenu()">메뉴 추천</button></article>
+          <article class="panel"><div class="panel-head"><h3>참가자</h3></div><label>이름(쉼표 또는 줄바꿈)<textarea id="dinnerNames" placeholder="손동오, 김헌정, 곽규탁"></textarea></label><label>사다리 결과<textarea id="dinnerResults" placeholder="커피 사기, 계산, 면제"></textarea></label><div class="actions"><button class="btn primary" onclick="runDinnerLadder()">사다리타기</button><button class="btn" onclick="runDinnerRoulette()">룰렛</button></div></article>
+          <article class="panel span-2"><div class="panel-head"><h3>게임 결과</h3></div><div class="game-result" id="dinnerGameResult">결과가 여기에 표시됩니다.</div></article>
+        </div>
+      </section>
       <section id="accountPage" class="page">
         <div class="content-grid">
           <article class="panel">
@@ -820,47 +823,7 @@
           </article>
         </div>
       </section>
-
-      <section id="kpiPage" class="page">
-        <div class="panel kpi-host-panel">
-          <div class="panel-head">
-            <div>
-              <h3>B2C 직원 KPI 관리</h3>
-              <small class="muted-text">서린 물류 포털 안에서 바로 사용합니다.</small>
-            </div>
-            <div class="kpi-header-actions">
-              <span class="badge">직원 점수·등급·순위 비공개</span>
-              <button id="reloadKpiBtn" class="btn small">KPI 새로고침</button>
-            </div>
-          </div>
-          <iframe
-            id="kpiFrame"
-            src="kpi.html"
-            title="B2C 직원 KPI 관리"
-            class="kpi-embedded-frame"
-            loading="eager"
-          ></iframe>
-        </div>
-      </section>
-
-
-      <section id="b2bPage" class="page">
-        <div class="panel b2b-host-panel">
-          <div class="panel-head">
-            <div>
-              <h3>B2B 작업 통계·반기 성과평가</h3>
-              <small class="muted-text">B2B 원본 로그인 방식을 그대로 사용합니다.</small>
-            </div>
-            <div class="kpi-header-actions">
-              <span class="badge">B2B 별도 로그인 사용</span>
-              <button id="reloadB2bBtn" class="btn small">B2B 새로고침</button>
-            </div>
-          </div>
-          <iframe id="b2bFrame" src="b2b.html" title="B2B 작업 통계" class="b2b-embedded-frame"></iframe>
-        </div>
-      </section>
-
-      <section id="employeesPage" class="page">
+<section id="employeesPage" class="page">
         <div class="employee-manage-layout">
           <article class="panel employee-list-panel">
             <div class="panel-head">
