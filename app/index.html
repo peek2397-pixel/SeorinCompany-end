@@ -758,23 +758,46 @@
 
       </section>
 
-        <section id="forkliftPage" class="page"><div class="asset-tabs"><button class="btn primary" onclick="switchAssetTab('transport')">운송팀 차량</button><button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button><button class="btn" onclick="switchAssetTab('forklift')">지게차</button></div>
-        <div class="panel"><div class="panel-head"><div><h3>지게차관리</h3><small>종합물류·3물류 지게차의 증류수 보충일, 가동시간, 엔진오일·타이어·부품 교환을 별도로 관리합니다.</small></div></div></div>
-          <div class="content-grid">
+        <section id="forkliftPage" class="page">
+          <div class="asset-tabs">
+            <button class="btn" onclick="switchAssetTab('transport')">운송팀 차량</button>
+            <button class="btn" onclick="switchAssetTab('vehicles')">일반 차량</button>
+            <button class="btn primary" onclick="switchAssetTab('forklift')">지게차</button>
+            <button id="forkliftManageToggleBtn" class="btn" onclick="toggleForkliftManagement()">관리</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>지게차관리</h3>
+                <small>종합물류와 3물류를 좌우로 나누어 전동·디젤 지게차 현황을 한눈에 확인합니다.</small>
+              </div>
+            </div>
+            <div id="forkliftAssetCards" class="forklift-split"></div>
+          </div>
+
+          <section id="forkliftManagePanel" class="hidden">
             <article class="panel">
-              <div class="panel-head"><div><h3>지게차 등록·수정</h3><small>종합물류 이형기 대리 / 3물류 구강석 대리</small></div></div>
+              <div class="panel-head">
+                <div><h3>지게차 등록·수정</h3><small>관리자 전용 · 종합물류 이형기 대리 / 3물류 구강석 대리</small></div>
+                <button class="btn" onclick="toggleForkliftManagement(false)">닫기</button>
+              </div>
               <div class="form-grid">
-                <label>지게차명<input id="forkliftName" placeholder="예: 전동지게차 A" /></label><label>구분<select id="forkliftType"><option>전동</option><option>디젤</option></select></label>
+                <label>지게차명<input id="forkliftName" placeholder="예: 전동지게차 A" /></label>
+                <label>구분<select id="forkliftType"><option>전동</option><option>디젤</option></select></label>
                 <label>위치<select id="forkliftLocation"><option>종합물류</option><option>3물류</option></select></label>
                 <label>담당자<input id="forkliftManager" placeholder="이형기 또는 구강석" /></label>
                 <label>현재 가동시간<input id="forkliftHours" type="number" min="0" /></label>
-                <label>상태<select id="forkliftStatus"><option>사용중</option><option>정비중</option><option>사용중지</option></select></label>
-                <label>비고<input id="forkliftMemo" /></label>
+                <label>상태<select id="forkliftStatus"><option>사용중</option><option>대기</option><option>정비중</option><option>수리중</option><option>고장</option><option>사용중지</option><option>폐기</option></select></label>
+                <label class="span-2">비고<input id="forkliftMemo" /></label>
               </div>
-              <div class="actions"><button id="saveForkliftBtn" class="btn primary">지게차 저장</button><button id="clearForkliftBtn" class="btn">초기화</button></div>
+              <div class="actions">
+                <button id="saveForkliftBtn" class="btn primary">지게차 저장</button>
+                <button id="clearForkliftBtn" class="btn">초기화</button>
+              </div>
             </article>
-            <article class="panel span-2"><div class="panel-head"><h3>지게차 현황</h3></div><div id="forkliftAssetCards" class="forklift-split"></div></article>
-          </div>
+          </section>
+
           <article class="panel">
             <div class="panel-head"><div><h3>지게차 증류수·정비·부품 보고</h3><small>담당자 보고 → 김헌정 주임 금액 확인 → 손동오 관리자 최종 결재</small></div></div>
             <div class="form-grid">
@@ -790,23 +813,76 @@
           </article>
         </section>
 
-
       <section id="dinnerPage" class="page">
-        <div class="content-grid">
-          <article class="panel"><div class="panel-head"><h3>오늘 회식 메뉴</h3></div><div class="game-result" id="dinnerMenuResult">버튼을 눌러 메뉴를 추천받으세요.</div><button class="btn primary" onclick="pickDinnerMenu()">메뉴 추천</button></article>
-          <article class="panel"><div class="panel-head"><h3>참가자</h3></div><label>이름(쉼표 또는 줄바꿈)<textarea id="dinnerNames" placeholder="손동오, 김헌정, 곽규탁"></textarea></label><label>사다리 결과<textarea id="dinnerResults" placeholder="커피 사기, 계산, 면제"></textarea></label><div class="actions"><button class="btn primary" onclick="runDinnerLadder()">사다리타기</button><button class="btn" onclick="runDinnerRoulette()">룰렛</button></div></article>
-          <article class="panel span-2"><div class="panel-head"><h3>게임 결과</h3></div><div class="game-result" id="dinnerGameResult">결과가 여기에 표시됩니다.</div></article>
-          <article class="panel span-2">
-            <div class="panel-head"><div><h3>직원 비밀방</h3><small>선택한 직원만 참여하는 회식 전용 그룹 대화방입니다.</small></div></div>
+        <div class="dinner-layout">
+          <article class="panel dinner-create-panel">
+            <div class="panel-head"><div><h3>회식방 만들기</h3><small>회식방을 만든 뒤 참여 직원이 메뉴를 선택하고 게임을 진행합니다.</small></div></div>
             <div class="form-grid">
-              <label>방 이름<input id="dinnerSecretRoomName" placeholder="예: 7월 물류팀 회식 비밀방" /></label>
-              <label class="span-2">참여 직원 이름<textarea id="dinnerSecretMembers" placeholder="곽규탁, 엄수현, 김헌정
-이름은 쉼표 또는 줄바꿈으로 구분하세요."></textarea></label>
+              <label>회식방 이름<input id="dinnerRoomName" placeholder="예: 7월 물류팀 회식" /></label>
+              <label>회식 날짜<input id="dinnerRoomDate" type="date" /></label>
+              <label class="span-2">직원 검색<input id="dinnerEmployeeSearch" placeholder="이름을 입력하세요" /></label>
             </div>
-            <div class="inline-actions"><button id="showDinnerEmployeesBtn" type="button" class="btn">직원 이름 불러오기</button></div>
-            <div id="dinnerSecretEmployeeList" class="dinner-employee-list"></div>
-            <div id="dinnerSecretMemberResult" class="muted-text">직원 이름 버튼을 눌러 선택하거나 직접 입력하세요.</div>
-            <div class="actions"><button class="btn primary" onclick="createDinnerSecretRoom()">비밀방 만들기</button></div>
+            <div id="dinnerEmployeePicker" class="dinner-employee-list"></div>
+            <div class="selected-member-box"><b>선택 직원</b><div id="dinnerSelectedEmployees" class="dinner-selected-list">선택된 직원이 없습니다.</div></div>
+            <div class="actions"><button id="createDinnerRoomBtn" class="btn primary">회식방 만들기</button><button id="clearDinnerRoomBtn" class="btn">초기화</button></div>
+          </article>
+
+          <article class="panel dinner-room-list-panel">
+            <div class="panel-head"><div><h3>내 회식방</h3><small>내가 참여하는 회식방만 표시됩니다.</small></div><button id="refreshDinnerRoomsBtn" class="btn">새로고침</button></div>
+            <div id="dinnerRoomList" class="dinner-room-list"><div class="empty">회식방이 없습니다.</div></div>
+          </article>
+
+          <article id="dinnerRoomWorkspace" class="panel span-2 hidden">
+            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><button id="openDinnerChatBtn" class="btn">회식방 채팅 열기</button></div>
+            <div class="dinner-tabs">
+              <button class="btn primary dinner-tab" data-dtab="members">참여 직원</button>
+              <button class="btn dinner-tab" data-dtab="menu">메뉴 선택</button>
+              <button class="btn dinner-tab" data-dtab="ladder">사다리타기</button>
+              <button class="btn dinner-tab" data-dtab="roulette">룰렛</button>
+              <button class="btn dinner-tab" data-dtab="teams">팀 나누기</button>
+              <button class="btn dinner-tab" data-dtab="seats">자리 배치</button>
+              <button class="btn dinner-tab" data-dtab="penalty">벌칙 게임</button>
+            </div>
+
+            <div id="dinnerTabMembers" class="dinner-tab-panel">
+              <h4>참여 직원</h4><div id="dinnerRoomMembers" class="dinner-member-cards"></div>
+            </div>
+
+            <div id="dinnerTabMenu" class="dinner-tab-panel hidden">
+              <div class="form-grid"><label>메뉴 후보<input id="dinnerMenuCandidate" placeholder="예: 삼겹살" /></label></div>
+              <div class="actions"><button id="addDinnerMenuBtn" class="btn primary">메뉴 후보 추가</button></div>
+              <p class="muted-text">직원이 원하는 메뉴의 선택 버튼을 누르면 투표가 집계됩니다.</p>
+              <div id="dinnerMenuVoteList"></div>
+            </div>
+
+            <div id="dinnerTabLadder" class="dinner-tab-panel hidden">
+              <label>결과 항목<textarea id="dinnerLadderResults" placeholder="계산, 커피 사기, 면제"></textarea></label>
+              <div class="actions"><button id="runDinnerLadderBtn" class="btn primary">사다리타기 시작</button></div>
+              <div id="dinnerLadderOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+            </div>
+
+            <div id="dinnerTabRoulette" class="dinner-tab-panel hidden">
+              <label>룰렛 항목<textarea id="dinnerRouletteItems" placeholder="계산하기, 노래하기, 면제"></textarea></label>
+              <div class="actions"><button id="runDinnerRouletteBtn" class="btn primary">룰렛 돌리기</button></div>
+              <div id="dinnerRouletteOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+            </div>
+
+            <div id="dinnerTabTeams" class="dinner-tab-panel hidden">
+              <label>팀 수<input id="dinnerTeamCount" type="number" min="2" value="2" /></label>
+              <div class="actions"><button id="runDinnerTeamsBtn" class="btn primary">랜덤 팀 나누기</button></div>
+              <div id="dinnerTeamsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+            </div>
+
+            <div id="dinnerTabSeats" class="dinner-tab-panel hidden">
+              <div class="actions"><button id="runDinnerSeatsBtn" class="btn primary">랜덤 자리 배치</button></div>
+              <div id="dinnerSeatsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+            </div>
+
+            <div id="dinnerTabPenalty" class="dinner-tab-panel hidden">
+              <label>벌칙 목록<textarea id="dinnerPenaltyItems" placeholder="노래 한 곡, 음료 사기, 사진 포즈"></textarea></label>
+              <div class="actions"><button id="runDinnerPenaltyBtn" class="btn primary">벌칙 뽑기</button></div>
+              <div id="dinnerPenaltyOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+            </div>
           </article>
         </div>
       </section>
