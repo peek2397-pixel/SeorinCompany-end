@@ -959,3 +959,17 @@ body.modal-open{overflow:hidden}
 .dinner-employee-list{display:block;max-height:360px}
 .dinner-employee-group{padding:10px 0;border-bottom:1px solid #e5edf6}.dinner-employee-group:last-child{border-bottom:0}.dinner-employee-group h4{margin:0 0 8px;color:#12345b}.dinner-employee-group h4 span{font-weight:500;color:#65758a}.dinner-employee-group-list{display:flex;flex-wrap:wrap;gap:7px}
 .test-data-manager-panel{margin-top:14px}.test-data-category-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.test-data-record-list{display:grid;gap:7px;max-height:480px;overflow:auto;border:1px solid #dce6f1;border-radius:10px;padding:10px;background:#f8fbff}.test-data-record{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #dce6f1;border-radius:9px;background:#fff;cursor:pointer}.test-data-record:hover{border-color:#1677ff}.test-data-record span{display:grid;gap:3px}.test-data-record small{color:#738298}.compact-head{margin-top:8px}
+
+/* V101 회식방 참여자·채팅·게임 우측 통합 */
+.dinner-layout{grid-template-columns:minmax(0,1.05fr) minmax(480px,.95fr)}
+.dinner-right-column{grid-row:1/4;position:static}
+#dinnerRoomWorkspace{display:block!important;grid-column:auto}
+.dinner-chat-side{padding:14px;display:block}
+.dinner-chat-side.hidden{display:none}
+.dinner-participant-section,.dinner-chat-section,.dinner-game-workspace{margin-top:12px;padding-top:12px;border-top:1px solid #e2eaf3}
+.dinner-section-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.dinner-section-title small{color:#6b7a90}
+.dinner-chat-messages{height:260px}
+.dinner-game-workspace{background:#fbfdff;border:1px solid #dbe6f2;border-radius:12px;padding:12px}
+.dinner-member-cards{min-height:36px}
+@media(max-width:1100px){.dinner-layout{grid-template-columns:1fr}.dinner-right-column{grid-column:1;grid-row:auto}.dinner-chat-messages{height:300px}}

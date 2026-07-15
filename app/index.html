@@ -857,66 +857,75 @@
               <div id="dinnerRoomList" class="dinner-room-list"><div class="empty">회식방이 없습니다.</div></div>
             </article>
             <aside id="dinnerChatPanel" class="panel dinner-chat-side hidden">
-              <div class="panel-head compact-head"><div><h4 id="dinnerChatTitle">회식방 채팅</h4><small>방에 참여한 직원끼리 바로 대화합니다.</small></div></div>
-              <div id="dinnerChatMessages" class="dinner-chat-messages"><div class="empty">회식방을 선택하세요.</div></div>
-              <div class="dinner-chat-compose"><textarea id="dinnerChatInput" placeholder="메시지를 입력하세요. Enter 전송 / Shift+Enter 줄바꿈"></textarea><button id="sendDinnerChatBtn" class="btn primary">전송</button></div>
+              <div class="panel-head compact-head">
+                <div>
+                  <h3 id="dinnerWorkspaceTitle">회식방</h3>
+                  <small id="dinnerWorkspaceMeta"></small>
+                </div>
+                <span class="badge">초대 직원 전용</span>
+              </div>
+
+              <section class="dinner-participant-section">
+                <div class="dinner-section-title"><b>참여자</b><small>이 방에 참여한 직원입니다.</small></div>
+                <div id="dinnerRoomMembers" class="dinner-member-cards"></div>
+              </section>
+
+              <section class="dinner-chat-section">
+                <div class="dinner-section-title"><b id="dinnerChatTitle">회식방 채팅</b><small>참여자끼리 바로 대화합니다.</small></div>
+                <div id="dinnerChatMessages" class="dinner-chat-messages"><div class="empty">회식방을 선택하세요.</div></div>
+                <div class="dinner-chat-compose"><textarea id="dinnerChatInput" placeholder="메시지를 입력하세요. Enter 전송 / Shift+Enter 줄바꿈"></textarea><button id="sendDinnerChatBtn" class="btn primary">전송</button></div>
+              </section>
+
+              <article id="dinnerRoomWorkspace" class="dinner-game-workspace">
+                <div class="dinner-section-title"><b>참여자 게임</b><small>현재 회식방 참여자 명단으로 바로 진행합니다.</small></div>
+                <div class="dinner-tabs">
+                  <button class="btn dinner-tab" data-dtab="menu">메뉴 선택</button>
+                  <button class="btn primary dinner-tab" data-dtab="ladder">사다리타기</button>
+                  <button class="btn dinner-tab" data-dtab="roulette">룰렛</button>
+                  <button class="btn dinner-tab" data-dtab="teams">팀 나누기</button>
+                  <button class="btn dinner-tab" data-dtab="seats">자리 배치</button>
+                  <button class="btn dinner-tab" data-dtab="penalty">벌칙 게임</button>
+                </div>
+
+                <div id="dinnerTabMembers" class="dinner-tab-panel hidden"></div>
+
+                <div id="dinnerTabMenu" class="dinner-tab-panel hidden">
+                  <div class="form-grid"><label>메뉴 후보<input id="dinnerMenuCandidate" placeholder="예: 삼겹살" /></label></div>
+                  <div class="actions"><button id="addDinnerMenuBtn" class="btn primary">메뉴 후보 추가</button></div>
+                  <p class="muted-text">직원이 원하는 메뉴의 선택 버튼을 누르면 투표가 집계됩니다.</p>
+                  <div id="dinnerMenuVoteList"></div>
+                </div>
+
+                <div id="dinnerTabLadder" class="dinner-tab-panel">
+                  <label>결과 항목<textarea id="dinnerLadderResults" placeholder="계산, 커피 사기, 면제"></textarea></label>
+                  <div class="actions"><button id="runDinnerLadderBtn" class="btn primary">사다리타기 시작</button></div>
+                  <div id="dinnerLadderOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+                </div>
+
+                <div id="dinnerTabRoulette" class="dinner-tab-panel hidden">
+                  <label>룰렛 항목<textarea id="dinnerRouletteItems" placeholder="계산하기, 노래하기, 면제"></textarea></label>
+                  <div class="actions"><button id="runDinnerRouletteBtn" class="btn primary">룰렛 돌리기</button></div>
+                  <div id="dinnerRouletteOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+                </div>
+
+                <div id="dinnerTabTeams" class="dinner-tab-panel hidden">
+                  <label>팀 수<input id="dinnerTeamCount" type="number" min="2" value="2" /></label>
+                  <div class="actions"><button id="runDinnerTeamsBtn" class="btn primary">랜덤 팀 나누기</button></div>
+                  <div id="dinnerTeamsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+                </div>
+
+                <div id="dinnerTabSeats" class="dinner-tab-panel hidden">
+                  <div class="actions"><button id="runDinnerSeatsBtn" class="btn primary">랜덤 자리 배치</button></div>
+                  <div id="dinnerSeatsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+                </div>
+
+                <div id="dinnerTabPenalty" class="dinner-tab-panel hidden">
+                  <label>벌칙 목록<textarea id="dinnerPenaltyItems" placeholder="노래 한 곡, 음료 사기, 사진 포즈"></textarea></label>
+                  <div class="actions"><button id="runDinnerPenaltyBtn" class="btn primary">벌칙 뽑기</button></div>
+                  <div id="dinnerPenaltyOutput" class="game-result">결과가 여기에 표시됩니다.</div>
+                </div>
+              </article>
             </aside>
-          </div>
-
-          <article id="dinnerRoomWorkspace" class="panel hidden">
-            <div class="panel-head"><div><h3 id="dinnerWorkspaceTitle">회식방</h3><small id="dinnerWorkspaceMeta"></small></div><span class="badge">초대 직원 전용</span></div>
-            <div class="dinner-game-side">
-            <div class="dinner-tabs">
-              <button class="btn primary dinner-tab" data-dtab="members">참여 직원</button>
-              <button class="btn dinner-tab" data-dtab="menu">메뉴 선택</button>
-              <button class="btn dinner-tab" data-dtab="ladder">사다리타기</button>
-              <button class="btn dinner-tab" data-dtab="roulette">룰렛</button>
-              <button class="btn dinner-tab" data-dtab="teams">팀 나누기</button>
-              <button class="btn dinner-tab" data-dtab="seats">자리 배치</button>
-              <button class="btn dinner-tab" data-dtab="penalty">벌칙 게임</button>
-            </div>
-
-            <div id="dinnerTabMembers" class="dinner-tab-panel">
-              <h4>참여 직원</h4><div id="dinnerRoomMembers" class="dinner-member-cards"></div>
-            </div>
-
-            <div id="dinnerTabMenu" class="dinner-tab-panel hidden">
-              <div class="form-grid"><label>메뉴 후보<input id="dinnerMenuCandidate" placeholder="예: 삼겹살" /></label></div>
-              <div class="actions"><button id="addDinnerMenuBtn" class="btn primary">메뉴 후보 추가</button></div>
-              <p class="muted-text">직원이 원하는 메뉴의 선택 버튼을 누르면 투표가 집계됩니다.</p>
-              <div id="dinnerMenuVoteList"></div>
-            </div>
-
-            <div id="dinnerTabLadder" class="dinner-tab-panel hidden">
-              <label>결과 항목<textarea id="dinnerLadderResults" placeholder="계산, 커피 사기, 면제"></textarea></label>
-              <div class="actions"><button id="runDinnerLadderBtn" class="btn primary">사다리타기 시작</button></div>
-              <div id="dinnerLadderOutput" class="game-result">결과가 여기에 표시됩니다.</div>
-            </div>
-
-            <div id="dinnerTabRoulette" class="dinner-tab-panel hidden">
-              <label>룰렛 항목<textarea id="dinnerRouletteItems" placeholder="계산하기, 노래하기, 면제"></textarea></label>
-              <div class="actions"><button id="runDinnerRouletteBtn" class="btn primary">룰렛 돌리기</button></div>
-              <div id="dinnerRouletteOutput" class="game-result">결과가 여기에 표시됩니다.</div>
-            </div>
-
-            <div id="dinnerTabTeams" class="dinner-tab-panel hidden">
-              <label>팀 수<input id="dinnerTeamCount" type="number" min="2" value="2" /></label>
-              <div class="actions"><button id="runDinnerTeamsBtn" class="btn primary">랜덤 팀 나누기</button></div>
-              <div id="dinnerTeamsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
-            </div>
-
-            <div id="dinnerTabSeats" class="dinner-tab-panel hidden">
-              <div class="actions"><button id="runDinnerSeatsBtn" class="btn primary">랜덤 자리 배치</button></div>
-              <div id="dinnerSeatsOutput" class="game-result">결과가 여기에 표시됩니다.</div>
-            </div>
-
-            <div id="dinnerTabPenalty" class="dinner-tab-panel hidden">
-              <label>벌칙 목록<textarea id="dinnerPenaltyItems" placeholder="노래 한 곡, 음료 사기, 사진 포즈"></textarea></label>
-              <div class="actions"><button id="runDinnerPenaltyBtn" class="btn primary">벌칙 뽑기</button></div>
-              <div id="dinnerPenaltyOutput" class="game-result">결과가 여기에 표시됩니다.</div>
-            </div>
-            </div>
-          </article>
         </div>
       </section>
       <section id="accountPage" class="page">
