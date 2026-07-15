@@ -973,3 +973,6 @@ body.modal-open{overflow:hidden}
 .dinner-game-workspace{background:#fbfdff;border:1px solid #dbe6f2;border-radius:12px;padding:12px}
 .dinner-member-cards{min-height:36px}
 @media(max-width:1100px){.dinner-layout{grid-template-columns:1fr}.dinner-right-column{grid-column:1;grid-row:auto}.dinner-chat-messages{height:300px}}
+
+/* V102 dinner room presence */
+.dinner-member-cards{display:flex;flex-wrap:wrap;gap:8px}.dinner-member-card{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #dbe4ef;border-radius:12px;background:#fff}.presence-dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#aeb8c5;box-shadow:0 0 0 3px rgba(174,184,197,.14)}.dinner-member-card.online .presence-dot{background:#20b15a;box-shadow:0 0 0 3px rgba(32,177,90,.15)}.room-owner-label{padding:2px 6px;border-radius:999px;background:#fff1d6;color:#a35d00;font-weight:700}.dinner-chat-side .panel-head .actions{display:flex;align-items:center;gap:8px}
