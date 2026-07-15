@@ -147,21 +147,47 @@ function normalizeDinnerName(v){return String(v||"").trim().replace(/\s+/g,"")}
 function dinnerToday(){return new Date().toISOString().slice(0,10)}
 function shuffleDinner(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const n=Math.floor(Math.random()*(i+1));[a[i],a[n]]=[a[n],a[i]]}return a}
 function getDinnerEmployeeRows(){
-  const registryByNo=new Map((state.employeeRegistry||[]).map(x=>[String(x.emp_no||""),x]));
-  return (state.employees||[])
-    .filter(x=>x.id&&x.is_active!==false)
-    .map(x=>{
-      const r=registryByNo.get(String(x.emp_no||""))||{};
-      return {
-        ...r,
-        ...x,
-        name:x.name||r.name||"",
-        department:x.department||r.department||"미지정 부서",
-        team:x.team||r.team||x.department||r.department||"미지정 팀",
-        position:x.position||r.position||""
-      };
-    })
-    .filter(x=>x.name);
+  // 회식방 직원 선택은 조직도와 같은 팀 편성을 그대로 사용합니다.
+  const profiles=state.employees||[];
+  const profileByNo=new Map(profiles.filter(x=>x.id).map(x=>[String(x.emp_no||""),x]));
+  const profileByName=new Map(profiles.filter(x=>x.id&&x.name).map(x=>[normalizeDinnerName(x.name),x]));
+  const orgPeople=(typeof getOrganizationPeople==="function"?getOrganizationPeople():[]);
+  const rows=[];
+
+  orgPeople.forEach(person=>{
+    const profile=profileByNo.get(String(person.emp_no||""))
+      ||profileByName.get(normalizeDinnerName(person.name));
+    if(!profile?.id||profile.is_active===false)return;
+
+    let team=String(person.team||profile.team||person.department||profile.department||"소속 미지정").trim();
+    // 물류총괄은 조직도와 동일하게 별도 물류팀으로 표시합니다.
+    if(person.name==="손동오"||String(person.emp_no||"").toUpperCase()==="EMP001"||String(person.emp_no||"")==="201911041")team="물류팀";
+
+    rows.push({
+      ...person,
+      ...profile,
+      id:profile.id,
+      emp_no:profile.emp_no||person.emp_no||"",
+      name:profile.name||person.name||"",
+      department:"물류본부",
+      team:team||"소속 미지정",
+      position:person.position||profile.position||""
+    });
+  });
+
+  // 조직도에 아직 반영되지 않은 로그인 직원도 누락되지 않게 보완합니다.
+  profiles.filter(x=>x.id&&x.is_active!==false).forEach(profile=>{
+    if(rows.some(r=>String(r.id)===String(profile.id)))return;
+    let team=String(profile.team||profile.department||"소속 미지정").trim();
+    if(profile.name==="손동오"||String(profile.emp_no||"").toUpperCase()==="EMP001"||String(profile.emp_no||"")==="201911041")team="물류팀";
+    rows.push({...profile,department:"물류본부",team,position:profile.position||""});
+  });
+
+  return rows.filter(x=>x.name).sort((a,b)=>
+    String(a.team||"").localeCompare(String(b.team||""),"ko")
+    ||positionRank(a.position)-positionRank(b.position)
+    ||String(a.name||"").localeCompare(String(b.name||""),"ko")
+  );
 }
 function clearDinnerRoomForm(){
   if($("dinnerRoomName"))$("dinnerRoomName").value="";
@@ -186,11 +212,11 @@ function renderDinnerEmployeePicker(){
   }
   if(!groups.some(g=>g.key===state.dinnerSelectedDepartment))state.dinnerSelectedDepartment=groups[0].key;
   if(teamBox){
-    teamBox.innerHTML=groups.map(g=>`<button type="button" class="btn small ${g.key===state.dinnerSelectedDepartment?'primary':''}" data-dinner-group="${escapeHtml(g.key)}">${escapeHtml(g.department)} · ${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join("");
+    teamBox.innerHTML=groups.map(g=>`<button type="button" class="btn small ${g.key===state.dinnerSelectedDepartment?'primary':''}" data-dinner-group="${escapeHtml(g.key)}">${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join("");
     teamBox.querySelectorAll('[data-dinner-group]').forEach(btn=>btn.addEventListener('click',()=>{state.dinnerSelectedDepartment=btn.dataset.dinnerGroup;renderDinnerEmployeePicker();}));
   }
   const selected=groups.find(g=>g.key===state.dinnerSelectedDepartment)||groups[0];
-  box.innerHTML=`<section class="dinner-employee-group"><h4>${escapeHtml(selected.department)} <span>· ${escapeHtml(selected.team)}</span></h4><div class="dinner-employee-group-list">${selected.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
+  box.innerHTML=`<section class="dinner-employee-group"><h4>${escapeHtml(selected.team)}</h4><div class="dinner-employee-group-list">${selected.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
   box.querySelectorAll('[data-dinner-employee]').forEach(btn=>btn.addEventListener('click',()=>{
     const id=String(btn.dataset.dinnerEmployee),set=new Set(state.selectedDinnerEmployeeIds.map(String));
     set.has(id)?set.delete(id):set.add(id);state.selectedDinnerEmployeeIds=[...set];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
