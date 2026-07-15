@@ -146,56 +146,41 @@ const BASIC_PERMISSIONS=new Set([
 function normalizeDinnerName(v){return String(v||"").trim().replace(/\s+/g,"")}
 function dinnerToday(){return new Date().toISOString().slice(0,10)}
 function shuffleDinner(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const n=Math.floor(Math.random()*(i+1));[a[i],a[n]]=[a[n],a[i]]}return a}
+const DINNER_FIXED_TEAMS={
+  "물류팀":["손동오"],
+  "발주팀":["장수범","노우석","함다정","김헌정","정영선"],
+  "해외팀":["김일신","이형기","엄수현","김일호","김래성","곽규탁","김상기","김태균","임태희"],
+  "국내팀":["이찬규","오정훈","여윤태","박상원"],
+  "B2C팀":["성경진","정해림","김미영","김상주","이와모토마유미"]
+};
+async function loadDinnerDirectory(){
+  const {data,error}=await supabaseClient.from("profiles")
+    .select("id,name,emp_no,team,department,position,is_active")
+    .eq("is_active",true)
+    .order("name");
+  if(error){console.error("회식방 직원 조회 실패",error);state.dinnerDirectory=[];return;}
+  state.dinnerDirectory=data||[];
+}
 function getDinnerEmployeeRows(){
-  // 회식방 직원 선택은 조직도와 같은 팀 편성을 그대로 사용합니다.
-  const profiles=[...(state.employees||[]),...(state.employeeRegistry||[])].filter((x,i,a)=>x&&x.name&&a.findIndex(y=>String(y.id||y.emp_no||y.name)===String(x.id||x.emp_no||x.name))===i);
-  const profileByNo=new Map(profiles.filter(x=>x.id).map(x=>[String(x.emp_no||""),x]));
-  const profileByName=new Map(profiles.filter(x=>x.id&&x.name).map(x=>[normalizeDinnerName(x.name),x]));
-  const orgPeople=(typeof getOrganizationPeople==="function"?getOrganizationPeople():[]);
+  const source=[...(state.dinnerDirectory||[]),...(state.employees||[]),...(state.employeeRegistry||[])];
+  const byName=new Map();
+  source.forEach(x=>{if(x?.name&&!byName.has(normalizeDinnerName(x.name)))byName.set(normalizeDinnerName(x.name),x)});
   const rows=[];
-
-  orgPeople.forEach(person=>{
-    const profile=profileByNo.get(String(person.emp_no||""))
-      ||profileByName.get(normalizeDinnerName(person.name));
-    if(!profile?.id||profile.is_active===false)return;
-
-    let team=String(person.team||profile.team||person.department||profile.department||"소속 미지정").trim();
-    // 물류총괄은 조직도와 동일하게 별도 물류팀으로 표시합니다.
-    if(person.name==="손동오"||String(person.emp_no||"").toUpperCase()==="EMP001"||String(person.emp_no||"")==="201911041")team="물류팀";
-
-    rows.push({
-      ...person,
-      ...profile,
-      id:profile.id,
-      emp_no:profile.emp_no||person.emp_no||"",
-      name:profile.name||person.name||"",
-      department:"물류본부",
-      team:team||"소속 미지정",
-      position:person.position||profile.position||""
+  Object.entries(DINNER_FIXED_TEAMS).forEach(([team,names])=>{
+    names.forEach(name=>{
+      const p=byName.get(normalizeDinnerName(name));
+      if(!p||!p.id)return;
+      rows.push({...p,id:p.id,name,department:"물류본부",team,position:p.position||""});
     });
   });
-
-  // 조직도에 아직 반영되지 않은 로그인 직원도 누락되지 않게 보완합니다.
-  profiles.filter(x=>x.id&&x.is_active!==false).forEach(profile=>{
-    if(rows.some(r=>String(r.id)===String(profile.id)))return;
-    let team=String(profile.team||profile.department||"소속 미지정").trim();
-    const fixedTeamByName={
-      "손동오":"물류팀",
-      "장수범":"발주팀","노우석":"발주팀","함다정":"발주팀","김헌정":"발주팀","정영서":"발주팀",
-      "이찬규":"국내팀","오정훈":"국내팀","여윤태":"국내팀","박상원":"국내팀",
-      "김일신":"해외팀","이형기":"해외팀","엄수현":"해외팀","김일호":"해외팀","김래성":"해외팀","곽규탁":"해외팀","김상기":"해외팀","김태균":"해외팀","임태희":"해외팀",
-      "성경진":"B2C","정해림":"B2C","김상주":"고객운영지원팀","이와모토마유미":"고객운영지원팀"
-    };
-    team=fixedTeamByName[profile.name]||team;
-    if(profile.name==="손동오"||String(profile.emp_no||"").toUpperCase()==="EMP001"||String(profile.emp_no||"")==="201911041")team="물류팀";
-    rows.push({...profile,department:"물류본부",team,position:profile.position||""});
+  source.forEach(p=>{
+    if(!p?.id||!p?.name||p.is_active===false||rows.some(r=>String(r.id)===String(p.id)))return;
+    let team=String(p.team||p.department||"").trim();
+    if(team==="B2C")team="B2C팀";
+    if(!Object.prototype.hasOwnProperty.call(DINNER_FIXED_TEAMS,team))return;
+    rows.push({...p,department:"물류본부",team,position:p.position||""});
   });
-
-  return rows.filter(x=>x.name).sort((a,b)=>
-    String(a.team||"").localeCompare(String(b.team||""),"ko")
-    ||positionRank(a.position)-positionRank(b.position)
-    ||String(a.name||"").localeCompare(String(b.name||""),"ko")
-  );
+  return rows.sort((a,b)=>Object.keys(DINNER_FIXED_TEAMS).indexOf(a.team)-Object.keys(DINNER_FIXED_TEAMS).indexOf(b.team)||String(a.name).localeCompare(String(b.name),"ko"));
 }
 function clearDinnerRoomForm(){
   if($("dinnerRoomName"))$("dinnerRoomName").value="";
@@ -204,27 +189,17 @@ function clearDinnerRoomForm(){
 }
 function renderDinnerEmployeePicker(){
   const teamBox=$("dinnerDepartmentPicker"),box=$("dinnerEmployeePicker");if(!box)return;
-  const grouped=new Map();
-  getDinnerEmployeeRows().forEach(emp=>{
-    const department=String(emp.department||"미지정 부서").trim()||"미지정 부서";
-    const team=String(emp.team||department||"미지정 팀").trim()||"미지정 팀";
-    const key=`${department}||${team}`;
-    if(!grouped.has(key))grouped.set(key,{key,department,team,employees:[]});
-    grouped.get(key).employees.push(emp);
-  });
-  const groups=[...grouped.values()].sort((a,b)=>`${a.department}${a.team}`.localeCompare(`${b.department}${b.team}`,"ko"));
-  if(!groups.length){
-    if(teamBox)teamBox.innerHTML='<span class="muted-text">등록된 팀이 없습니다.</span>';
-    box.innerHTML='<span class="muted-text">표시할 직원이 없습니다.</span>';
-    return;
-  }
-  if(!groups.some(g=>g.key===state.dinnerSelectedDepartment))state.dinnerSelectedDepartment=groups[0].key;
+  const rows=getDinnerEmployeeRows();
+  const teams=Object.keys(DINNER_FIXED_TEAMS);
+  if(!teams.includes(state.dinnerSelectedDepartment))state.dinnerSelectedDepartment=teams[0];
   if(teamBox){
-    teamBox.innerHTML=groups.map(g=>`<button type="button" class="btn small ${g.key===state.dinnerSelectedDepartment?'primary':''}" data-dinner-group="${escapeHtml(g.key)}">${escapeHtml(g.team)} <small>${g.employees.length}명</small></button>`).join("");
-    teamBox.querySelectorAll('[data-dinner-group]').forEach(btn=>btn.addEventListener('click',()=>{state.dinnerSelectedDepartment=btn.dataset.dinnerGroup;renderDinnerEmployeePicker();}));
+    teamBox.innerHTML=teams.map(team=>`<button type="button" class="btn small ${team===state.dinnerSelectedDepartment?'primary':''}" data-dinner-team="${escapeHtml(team)}">${escapeHtml(team)}</button>`).join("");
+    teamBox.querySelectorAll('[data-dinner-team]').forEach(btn=>btn.addEventListener('click',()=>{state.dinnerSelectedDepartment=btn.dataset.dinnerTeam;renderDinnerEmployeePicker();}));
   }
-  const selected=groups.find(g=>g.key===state.dinnerSelectedDepartment)||groups[0];
-  box.innerHTML=`<section class="dinner-employee-group"><h4>${escapeHtml(selected.team)}</h4><div class="dinner-employee-group-list">${selected.employees.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div></section>`;
+  const members=rows.filter(x=>x.team===state.dinnerSelectedDepartment);
+  box.innerHTML=members.length
+    ?`<div class="dinner-employee-group-list">${members.map(e=>`<button type="button" class="btn small dinner-employee-chip ${state.selectedDinnerEmployeeIds.includes(String(e.id))?'primary':''}" data-dinner-employee="${escapeHtml(String(e.id))}">${escapeHtml(e.name)} <small>${escapeHtml(e.position||'')}</small></button>`).join("")}</div>`
+    :'<span class="muted-text">이 팀의 직원 정보를 불러오지 못했습니다. 새로고침을 눌러주세요.</span>';
   box.querySelectorAll('[data-dinner-employee]').forEach(btn=>btn.addEventListener('click',()=>{
     const id=String(btn.dataset.dinnerEmployee),set=new Set(state.selectedDinnerEmployeeIds.map(String));
     set.has(id)?set.delete(id):set.add(id);state.selectedDinnerEmployeeIds=[...set];renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
@@ -480,8 +455,8 @@ async function loadProfile(){
 async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();location.reload()}
 
 async function refreshAll(){
-  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
+  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 async function loadCards(){
   if(!has("card_use"))return;
@@ -3647,7 +3622,7 @@ bindChange("tripMonthFilter",renderVehicleTrips);bindChange("maintenanceMonthFil
 bindChange("tripVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicles()});bindChange("maintenanceVehicle",e=>{state.selectedVehicleId=e.target.value;renderVehicles()});
 document.querySelectorAll(".vehicle-tab").forEach(b=>b.onclick=()=>activateVehicleTab(b.dataset.vtab));
 bindClick("assetManageBtn",openAssetManagement);
-bindClick("createDinnerRoomBtn",createDinnerRoom);bindClick("clearDinnerRoomBtn",clearDinnerRoomForm);bindClick("refreshDinnerRoomsBtn",async()=>{await loadDinnerRooms();renderDinnerRooms();toast("회식방을 새로고침했습니다.")});
+bindClick("createDinnerRoomBtn",createDinnerRoom);bindClick("clearDinnerRoomBtn",clearDinnerRoomForm);bindClick("refreshDinnerRoomsBtn",async()=>{await Promise.all([loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadDinnerRooms()]);renderDinnerEmployeePicker();renderDinnerSelectedEmployees();renderDinnerRooms();toast("직원 팀과 회식방을 새로고침했습니다.")});
 bindClick("addDinnerMenuBtn",addDinnerMenu);bindClick("runDinnerLadderBtn",runDinnerLadderRoom);bindClick("runDinnerRouletteBtn",runDinnerRouletteRoom);bindClick("runDinnerTeamsBtn",runDinnerTeamsRoom);bindClick("runDinnerSeatsBtn",runDinnerSeatsRoom);bindClick("runDinnerPenaltyBtn",runDinnerPenaltyRoom);bindClick("sendDinnerChatBtn",sendDinnerChat);document.querySelectorAll(".dinner-tab").forEach(b=>b.addEventListener("click",()=>activateDinnerTab(b.dataset.dtab)));if($("dinnerRoomDate"))$("dinnerRoomDate").value=dinnerToday();if($("dinnerChatInput"))$("dinnerChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendDinnerChat();}});renderDinnerEmployeePicker();renderDinnerSelectedEmployees();
 
 $("changePasswordBtn").onclick=changePassword;
