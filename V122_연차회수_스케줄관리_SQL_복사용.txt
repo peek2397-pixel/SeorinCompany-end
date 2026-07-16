@@ -1,0 +1,93 @@
+﻿BEGIN;
+
+-- ==========================================================
+-- V122 연차·일정 회수 + 스케줄 관리
+-- 본인은 본인 일정 회수 가능
+-- 김헌정·손동오는 모든 직원 일정 회수 가능
+-- ==========================================================
+
+DROP FUNCTION IF EXISTS public.recall_work_calendar_entry(text);
+
+CREATE FUNCTION public.recall_work_calendar_entry(
+  p_entry_id text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_entry public.work_calendar_entries%ROWTYPE;
+  v_name text;
+  v_is_schedule_admin boolean := false;
+  v_is_owner boolean := false;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION '로그인이 필요합니다.';
+  END IF;
+
+  SELECT
+    COALESCE(NULLIF(TRIM(p.name),''),'직원'),
+    TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  INTO v_name, v_is_schedule_admin
+  FROM public.profiles p
+  WHERE p.id::text = auth.uid()::text
+  LIMIT 1;
+
+  SELECT *
+  INTO v_entry
+  FROM public.work_calendar_entries
+  WHERE id::text = TRIM(p_entry_id)
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '회수할 일정을 찾을 수 없습니다.';
+  END IF;
+
+  v_is_owner := v_entry.employee_id::text = auth.uid()::text;
+
+  IF NOT v_is_owner AND NOT COALESCE(v_is_schedule_admin,false) THEN
+    RAISE EXCEPTION '본인 일정만 회수할 수 있습니다.';
+  END IF;
+
+  DELETE FROM public.work_calendar_entries
+  WHERE id::text = v_entry.id::text;
+
+  RETURN jsonb_build_object(
+    'success',true,
+    'entry_id',v_entry.id,
+    'event_type',v_entry.event_type,
+    'employee_id',v_entry.employee_id,
+    'recalled_by',v_name,
+    'message','일정을 회수했습니다. 연차·대휴 잔여 수량이 다시 계산됩니다.'
+  );
+END;
+$$;
+
+REVOKE ALL
+ON FUNCTION public.recall_work_calendar_entry(text)
+FROM public;
+
+GRANT EXECUTE
+ON FUNCTION public.recall_work_calendar_entry(text)
+TO authenticated;
+
+GRANT SELECT,DELETE
+ON TABLE public.work_calendar_entries
+TO authenticated;
+
+ALTER TABLE public.work_calendar_entries REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime
+    ADD TABLE public.work_calendar_entries;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
+NOTIFY pgrst, 'reload schema';
+
+COMMIT;

@@ -1031,3 +1031,7 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 
 /* V121 안전한 물품 삭제 */
 .inventory-in-use{display:inline-block;padding:5px 8px;border:1px solid #d7dee9;border-radius:8px;background:#f3f5f8;color:#64748b;font-size:11px;font-weight:700;white-space:normal}
+
+/* V122 스케줄 관리 */
+.schedule-admin-filter{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px}
+@media(max-width:800px){.schedule-admin-filter{grid-template-columns:1fr}}

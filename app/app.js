@@ -22,6 +22,7 @@ const pageInfo = {
   inventory:["물품관리","요소수 등 물류 소모품 재고관리"],
   purchase:["구매관리","구매요청과 승인 상태 관리"],
   calendar:["근무·휴무 달력","연차, 반차, 반반차, 주말근무와 대체휴일을 관리합니다."],
+  scheduleAdmin:["스케줄 관리","김헌정·손동오 전용으로 전체 직원 일정을 조회·회수합니다."],
   contractors:["외주 업체 인력관리","날짜별 외주 출근·식사 인원과 점심 주문 수량을 관리합니다."],
   events:["회사 일정·B2C 행사","전 직원이 함께 확인하는 행사와 회사 일정을 관리합니다."],
   meetings:["회의실 예약","회의실 일정과 미팅 정보를 예약하고 확인합니다."],
@@ -43,6 +44,7 @@ const menus = [
   ["corporateCard","법인카드","card_use"],
   ["purchase","구매·물품관리","purchase_view"],
   ["calendar","근무·휴무 달력","calendar_use"],
+  ["scheduleAdmin","스케줄 관리","__schedule_admin__"],
   ["events","회사 일정·B2C 행사","events_view"],
   ["meetings","회의실 예약","meetings_view"],
   ["contractors","외주 업체 인력관리","contractors_view"],
@@ -563,6 +565,7 @@ function showApp(){
 function renderMenu(){
   const rows=menus.filter(m=>{
     if(m[0]==="purchase")return has("purchase_view")||has("inventory_view");
+    if(m[0]==="scheduleAdmin")return isScheduleAdmin();
     return has(m[2]);
   });
   $("menu").innerHTML=rows.map(([id,label])=>{
@@ -580,6 +583,10 @@ function updateMenuBadges(){
   });
 }
 function goPage(id){
+  if(id==="scheduleAdmin"&&!isScheduleAdmin()){
+    toast("스케줄 관리는 김헌정·손동오만 사용할 수 있습니다.");
+    id="calendar";
+  }
   if(id==="transport"){state.vehicleViewGroup="transport";id="vehicles";}
   if(id==="purchase"&&!has("purchase_view")&&has("inventory_view"))id="inventory";
   if(id==="inventory"&&!has("inventory_view")&&has("purchase_view"))id="purchase";
@@ -588,6 +595,7 @@ function goPage(id){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")||(["transport","vehicles","forklift"].includes(id)&&b.dataset.page==="transport")));
   $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
   if(id==="permissions") renderPermissions();
+  if(id==="scheduleAdmin") renderScheduleAdmin();
 }
 
 function openSignup(){$("signupForm").classList.remove("hidden");$("signupMsg").textContent="";}
@@ -1785,18 +1793,96 @@ function renderCalendar(){
   }
 
   $("calendarHistory").innerHTML=table(
-    ["직원","시작일","종료일","구분","입력일수","환산/차감","메모"],
-    entries.slice().reverse().map(x=>[
-      x.profiles?.name||state.profile?.name||"",
+    ["직원","시작일","종료일","구분","입력일수","환산/차감","메모","관리"],
+    entries.slice().reverse().map(x=>{
+      const own=String(x.employee_id)===String(state.user.id);
+      const canRecall=own||isScheduleAdmin();
+      return [
+        x.profiles?.name||state.profile?.name||"",
+        x.start_date,
+        x.end_date,
+        calendarLabels[x.event_type]||x.event_type,
+        formatDays(x.days),
+        x.event_type==="weekend_work"?formatDays(Number(x.days)*1.5)+"일 적립":formatDays(x.days)+"일",
+        x.memo,
+        canRecall?`<button class="btn small danger" onclick="recallCalendarEntry('${x.id}')">회수</button>`:"-"
+      ];
+    })
+  );
+}
+
+function renderScheduleAdmin(){
+  if(!$("scheduleAdminTable"))return;
+  if(!isScheduleAdmin()){
+    $("scheduleAdminTable").innerHTML=`<div class="empty">김헌정·손동오만 사용할 수 있습니다.</div>`;
+    return;
+  }
+
+  const empSel=$("scheduleAdminEmployeeFilter");
+  const monthInput=$("scheduleAdminMonthFilter");
+  const typeSel=$("scheduleAdminTypeFilter");
+
+  if(empSel && !empSel.dataset.ready){
+    empSel.innerHTML=`<option value="all">전체 직원</option>`+
+      (state.employees||[]).map(e=>`<option value="${e.id}">${escapeHtml(e.name)} · ${escapeHtml(e.team||"")}</option>`).join("");
+    empSel.value="all";
+    empSel.dataset.ready="1";
+  }
+
+  if(monthInput && !monthInput.value)monthInput.value=monthKey(state.calendarDate||new Date());
+
+  const employeeId=empSel?.value||"all";
+  const month=monthInput?.value||"";
+  const type=typeSel?.value||"all";
+
+  let rows=(state.calendarEntries||[]).slice();
+  if(employeeId!=="all")rows=rows.filter(x=>String(x.employee_id)===String(employeeId));
+  if(month)rows=rows.filter(x=>String(x.start_date||"").slice(0,7)===month || String(x.end_date||"").slice(0,7)===month);
+  if(type!=="all")rows=rows.filter(x=>String(x.event_type)===type);
+  rows.sort((a,b)=>String(b.start_date||"").localeCompare(String(a.start_date||"")));
+
+  $("scheduleAdminTable").innerHTML=table(
+    ["직원","시작일","종료일","구분","일수","등록자","메모","관리"],
+    rows.map(x=>[
+      x.profiles?.name||"직원",
       x.start_date,
       x.end_date,
       calendarLabels[x.event_type]||x.event_type,
-      formatDays(x.days),
-      x.event_type==="weekend_work"?formatDays(Number(x.days)*1.5)+"일 적립":formatDays(x.days)+"일",
-      x.memo
+      formatDays(x.days)+"일",
+      x.created_by_name||"-",
+      x.memo||"",
+      `<button class="btn small danger" onclick="recallCalendarEntry('${x.id}',true)">회수</button>`
     ])
   );
 }
+
+window.recallCalendarEntry=async function(id,fromAdmin=false){
+  const row=(state.calendarEntries||[]).find(x=>String(x.id)===String(id));
+  if(!row){toast("회수할 일정을 찾을 수 없습니다.");return}
+
+  const own=String(row.employee_id)===String(state.user.id);
+  if(!own&&!isScheduleAdmin()){
+    toast("본인 일정만 회수할 수 있습니다.");
+    return;
+  }
+
+  const label=calendarLabels[row.event_type]||row.event_type;
+  const employeeName=row.profiles?.name||state.profile?.name||"직원";
+  if(!(await appConfirm(`${employeeName}의 ${label} 일정(${row.start_date}${row.end_date!==row.start_date?` ~ ${row.end_date}`:""})을 회수할까요?\n회수 즉시 달력에서 삭제되고 잔여 연차·대휴가 다시 계산됩니다.`,{title:"일정 회수"})))return;
+
+  const {data,error}=await supabaseClient.rpc("recall_work_calendar_entry",{p_entry_id:String(id)});
+  if(error){
+    toast("일정 회수 실패: "+error.message);
+    return;
+  }
+
+  await loadCalendarEntries();
+  renderCalendar();
+  if(isScheduleAdmin())renderScheduleAdmin();
+  renderDashboard();
+  toast(data?.message||`${label} 일정을 회수했습니다.`);
+};
+
 async function saveCalendarEntry(){
   const type=$("calType").value;
   let days=Number($("calDays").value||1);
@@ -2419,6 +2505,11 @@ const PURCHASE_STATUS={
   ordered:"발주완료", received:"입고완료", completed:"구매완료", rejected:"반려"
 };
 function purchaseStatusLabel(v){return PURCHASE_STATUS[v]||v||"-"}
+
+function isScheduleAdmin(){
+  const name=String(state.profile?.name||"").trim();
+  return name==="김헌정" || name==="손동오";
+}
 function isPurchaseManager(){return has("purchase_approve")||String(state.profile?.name||"").trim()==="손동오"}
 function isFinalPurchaseApprover(){return has("purchase_final_approve")||String(state.profile?.name||"").trim()==="손동오"||String(state.profile?.emp_no||"")==="201911041"}
 function formatDateTime(v){return v?new Date(v).toLocaleString("ko-KR",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"-"}
@@ -3823,6 +3914,10 @@ $("closeCalendarFormBtn").onclick=()=>{$("calendarForm").classList.add("hidden")
 $("saveCalendarBtn").onclick=saveCalendarEntry;
 $("prevMonthBtn").onclick=()=>moveCalendarMonth(-1);$("nextMonthBtn").onclick=()=>moveCalendarMonth(1);
 $("todayBtn").onclick=()=>{state.calendarDate=new Date();renderCalendar()};
+$("refreshScheduleAdminBtn")?.addEventListener("click",async()=>{await loadCalendarEntries();renderScheduleAdmin();});
+$("scheduleAdminEmployeeFilter")?.addEventListener("change",renderScheduleAdmin);
+$("scheduleAdminMonthFilter")?.addEventListener("change",renderScheduleAdmin);
+$("scheduleAdminTypeFilter")?.addEventListener("change",renderScheduleAdmin);
 $("calendarEmployeeFilter").onchange=()=>{
   const selected=$("calendarEmployeeFilter").value;
   if(has("calendar_manage")&&selected!=="all"&&$("calendarTargetEmployee")){
