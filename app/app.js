@@ -53,7 +53,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, inventoryHistoryItemIds:new Set(), sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -804,8 +804,12 @@ async function loadCards(){
 }
 async function loadItems(){
   if(!has("inventory_view"))return;
-  const {data,error}=await supabaseClient.from("inventory_items").select("*").order("name");
+  const [{data,error},{data:txRows,error:txError}]=await Promise.all([
+    supabaseClient.from("inventory_items").select("*").order("name"),
+    supabaseClient.from("inventory_transactions").select("item_id").limit(10000)
+  ]);
   if(!error)state.items=data||[];
+  if(!txError)state.inventoryHistoryItemIds=new Set((txRows||[]).map(x=>String(x.item_id)));
 }
 async function loadPurchaseRequests(){
   if(!has("purchase_view"))return;
@@ -2306,7 +2310,19 @@ function renderInventory(){
       }
     }
     if(admin){
-      controls.push(`<button class="btn small danger" onclick="deleteInventoryItem('${x.id}')">삭제</button>`);
+      const hasLinkedPurchase=linked.length>0;
+      const hasStock=Number(x.current_stock||0)!==0;
+      const hasHistory=state.inventoryHistoryItemIds?.has(String(x.id));
+      const blockers=[];
+      if(hasLinkedPurchase)blockers.push("구매신청 연결");
+      if(hasStock)blockers.push("재고 있음");
+      if(hasHistory)blockers.push("입출고 이력");
+
+      if(blockers.length){
+        controls.push(`<span class="inventory-in-use" title="${escapeHtml(blockers.join(", "))}">사용중 · ${escapeHtml(blockers.join(" / "))}</span>`);
+      }else{
+        controls.push(`<button class="btn small danger" onclick="deleteInventoryItem('${x.id}')">삭제</button>`);
+      }
     }
 
     return [
@@ -2379,10 +2395,21 @@ window.confirmInventoryReceipt=async function(requestId){
 window.deleteInventoryItem=async function(id){
   if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}
   const row=(state.items||[]).find(x=>String(x.id)===String(id));
-  if(!(await appConfirm(`${row?.name||"이 품목"}을 삭제할까요? 관련 입출고 기록이 있으면 삭제되지 않을 수 있습니다.`)))return;
-  const {error}=await supabaseClient.from("inventory_items").delete().eq("id",id);
-  if(error){toast("품목 삭제 실패: "+error.message);return}
-  fastRemoveFromState("items",id,()=>{renderInventory();renderDashboard();});toast("품목을 삭제했습니다.");
+  if(!(await appConfirm(`${row?.name||"이 품목"}을 삭제할까요? 연결된 구매신청, 재고, 입출고 이력이 없는 품목만 삭제됩니다.`)))return;
+
+  const {data,error}=await supabaseClient.rpc("admin_delete_inventory_item_safe",{
+    p_item_id:String(id)
+  });
+
+  if(error){
+    toast("품목 삭제 불가: "+error.message);
+    await Promise.all([loadItems(),loadPurchaseRequests()]);
+    renderInventory();
+    return;
+  }
+
+  fastRemoveFromState("items",id,()=>{renderInventory();renderDashboard();});
+  toast(data?.message||"품목을 삭제했습니다.");
 }
 function exportInventory(){
   exportXlsx(state.items.map(x=>({"품목명":x.name,"분류":x.category,"규격":x.specification,"단위":x.unit,"현재재고":x.current_stock,"최소재고":x.minimum_stock,"보관위치":x.storage_location,"거래처":x.vendor,"단가":x.unit_price})),"서린_물류물품_재고.xlsx","재고현황");

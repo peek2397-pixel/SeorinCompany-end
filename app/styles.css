@@ -1028,3 +1028,6 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 /* V120 물품 입고 확인 */
 .inventory-actions{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .receipt-confirmed{display:inline-block;padding:5px 7px;border:1px solid #bbdfc7;border-radius:7px;background:#eefbf2;color:#176936;line-height:1.35}
+
+/* V121 안전한 물품 삭제 */
+.inventory-in-use{display:inline-block;padding:5px 8px;border:1px solid #d7dee9;border-radius:8px;background:#f3f5f8;color:#64748b;font-size:11px;font-weight:700;white-space:normal}
