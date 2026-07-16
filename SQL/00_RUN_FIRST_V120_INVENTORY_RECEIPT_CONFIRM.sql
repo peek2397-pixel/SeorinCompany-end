@@ -1,0 +1,195 @@
+BEGIN;
+
+-- ==========================================================
+-- V120 물품관리 입고 확인
+-- 구매승인 품목을 물품관리에서 실제 입고 확인
+-- 재고 자동 증가 + 입출고 이력 생성 + 구매완료 처리
+-- ==========================================================
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_at timestamptz;
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_date date;
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_quantity numeric;
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_by uuid;
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_by_name text;
+
+ALTER TABLE public.purchase_requests
+ADD COLUMN IF NOT EXISTS received_memo text;
+
+DROP FUNCTION IF EXISTS public.confirm_purchase_inventory_receipt(text,numeric,date,text);
+
+CREATE FUNCTION public.confirm_purchase_inventory_receipt(
+  p_request_id text,
+  p_received_quantity numeric,
+  p_received_date date,
+  p_memo text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_request public.purchase_requests%ROWTYPE;
+  v_item public.inventory_items%ROWTYPE;
+  v_user_name text;
+  v_allowed boolean := false;
+  v_new_stock numeric;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION '로그인이 필요합니다.';
+  END IF;
+
+  IF p_received_quantity IS NULL OR p_received_quantity <= 0 THEN
+    RAISE EXCEPTION '입고 수량은 0보다 커야 합니다.';
+  END IF;
+
+  SELECT
+    COALESCE(NULLIF(TRIM(p.name),''),'직원'),
+    (
+      COALESCE(p.is_super_admin,false)
+      OR TRIM(COALESCE(p.name,'')) IN ('손동오','김헌정')
+      OR TRIM(COALESCE(p.emp_no::text,'')) = '201911041'
+    )
+  INTO v_user_name, v_allowed
+  FROM public.profiles p
+  WHERE p.id::text = auth.uid()::text
+  LIMIT 1;
+
+  IF NOT COALESCE(v_allowed,false) THEN
+    RAISE EXCEPTION '구매담당자 또는 관리자만 입고 확인할 수 있습니다.';
+  END IF;
+
+  SELECT *
+  INTO v_request
+  FROM public.purchase_requests
+  WHERE id::text = TRIM(p_request_id)
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '구매신청을 찾을 수 없습니다.';
+  END IF;
+
+  IF v_request.inventory_item_id IS NULL THEN
+    RAISE EXCEPTION '연결된 물품이 없습니다. 먼저 결재하여 물품관리 품목을 생성하세요.';
+  END IF;
+
+  IF v_request.received_at IS NOT NULL THEN
+    RAISE EXCEPTION '이미 입고 확인된 구매 건입니다.';
+  END IF;
+
+  IF COALESCE(v_request.status,'') NOT IN ('approved','ordered','received') THEN
+    RAISE EXCEPTION '승인 또는 발주 완료 상태에서만 입고 확인할 수 있습니다.';
+  END IF;
+
+  SELECT *
+  INTO v_item
+  FROM public.inventory_items
+  WHERE id::text = v_request.inventory_item_id::text
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '연결된 물품을 찾을 수 없습니다.';
+  END IF;
+
+  v_new_stock := COALESCE(v_item.current_stock,0) + p_received_quantity;
+
+  INSERT INTO public.inventory_transactions(
+    item_id,
+    transaction_type,
+    quantity,
+    person_name,
+    memo,
+    created_by,
+    source_purchase_request_id
+  )
+  VALUES(
+    v_item.id,
+    'in',
+    p_received_quantity,
+    v_user_name,
+    COALESCE(NULLIF(TRIM(p_memo),''),'구매 입고 확인'),
+    auth.uid(),
+    v_request.id
+  );
+
+  UPDATE public.inventory_items
+  SET current_stock = v_new_stock
+  WHERE id::text = v_item.id::text;
+
+  UPDATE public.purchase_requests
+  SET
+    status = 'completed',
+    received_at = now(),
+    received_date = COALESCE(p_received_date,current_date),
+    received_quantity = p_received_quantity,
+    received_by = auth.uid(),
+    received_by_name = v_user_name,
+    received_memo = NULLIF(TRIM(p_memo),''),
+    completed_at = COALESCE(completed_at,now())
+  WHERE id::text = v_request.id::text;
+
+  RETURN jsonb_build_object(
+    'success',true,
+    'request_id',v_request.id,
+    'item_id',v_item.id,
+    'received_quantity',p_received_quantity,
+    'new_stock',v_new_stock,
+    'received_by',v_user_name
+  );
+END;
+$$;
+
+REVOKE ALL
+ON FUNCTION public.confirm_purchase_inventory_receipt(text,numeric,date,text)
+FROM public;
+
+GRANT EXECUTE
+ON FUNCTION public.confirm_purchase_inventory_receipt(text,numeric,date,text)
+TO authenticated;
+
+GRANT SELECT,INSERT,UPDATE
+ON TABLE public.inventory_items,
+         public.inventory_transactions,
+         public.purchase_requests
+TO authenticated;
+
+ALTER TABLE public.purchase_requests REPLICA IDENTITY FULL;
+ALTER TABLE public.inventory_items REPLICA IDENTITY FULL;
+ALTER TABLE public.inventory_transactions REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.purchase_requests;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_items;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_transactions;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_purchase_requests_inventory_item_id
+ON public.purchase_requests(inventory_item_id);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_source_purchase_request
+ON public.inventory_transactions(source_purchase_request_id);
+
+NOTIFY pgrst, 'reload schema';
+
+COMMIT;

@@ -2285,10 +2285,97 @@ async function saveTx(){
 function renderInventory(){
   $("txItem").innerHTML=state.items.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} (${x.current_stock}${x.unit||""})</option>`).join("");
   const admin=isRecordAdmin();
-  const heads=["품목명","분류","규격","단위","현재재고","최소재고","상태","보관위치","거래처","단가",...(admin?["관리"]:[])];
-  const rows=state.items.map(x=>[x.name,x.category,x.specification,x.unit,x.current_stock,x.minimum_stock,Number(x.current_stock)<=Number(x.minimum_stock)?"부족":"정상",x.storage_location,x.vendor,money(x.unit_price),...(admin?[`<button class="btn small danger" onclick="deleteInventoryItem('${x.id}')">삭제</button>`]:[])]);
+  const canReceive=isPurchaseManager()||isFinalPurchaseApprover()||admin;
+  const heads=["품목명","분류","규격","단위","현재재고","최소재고","상태","보관위치","거래처","단가",...((admin||canReceive)?["관리"]:[])];
+
+  const rows=state.items.map(x=>{
+    const linked=(state.purchaseRequests||[])
+      .filter(p=>String(p.inventory_item_id||"")===String(x.id))
+      .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+
+    const pending=linked.filter(p=>["approved","ordered","received"].includes(p.status)&&!p.received_at);
+    const recentReceived=linked.find(p=>p.received_at);
+
+    const controls=[];
+    if(canReceive){
+      pending.forEach(p=>{
+        controls.push(`<button class="btn small success" onclick="confirmInventoryReceipt('${p.id}')">입고 확인 ${Number(p.quantity||0).toLocaleString("ko-KR")}${escapeHtml(p.unit||"")}</button>`);
+      });
+      if(recentReceived){
+        controls.push(`<small class="receipt-confirmed">입고완료 ${escapeHtml(String(recentReceived.received_quantity??recentReceived.quantity??""))}${escapeHtml(recentReceived.unit||"")}<br>${formatDateTime(recentReceived.received_at)}</small>`);
+      }
+    }
+    if(admin){
+      controls.push(`<button class="btn small danger" onclick="deleteInventoryItem('${x.id}')">삭제</button>`);
+    }
+
+    return [
+      x.name,x.category,x.specification,x.unit,x.current_stock,x.minimum_stock,
+      Number(x.current_stock)<=Number(x.minimum_stock)?"부족":"정상",
+      x.storage_location,x.vendor,money(x.unit_price),
+      ...((admin||canReceive)?[`<div class="inline-actions inventory-actions">${controls.join(" ")||"-"}</div>`]:[])
+    ];
+  });
   $("inventoryTable").innerHTML=tableHtml(heads,rows);
 }
+
+window.confirmInventoryReceipt=async function(requestId){
+  if(!(isPurchaseManager()||isFinalPurchaseApprover()||isRecordAdmin())){
+    toast("구매담당자 또는 관리자만 입고 확인할 수 있습니다.");
+    return;
+  }
+
+  const request=(state.purchaseRequests||[]).find(x=>String(x.id)===String(requestId));
+  if(!request){toast("연결된 구매신청을 찾을 수 없습니다.");return}
+  if(request.received_at){toast("이미 입고 확인된 구매 건입니다.");return}
+
+  const defaultQty=String(Number(request.quantity||0));
+  const qtyText=await appPrompt(
+    `'${request.item_name||"물품"}' 실제 입고 수량을 입력하세요.`,
+    {title:"입고 수량 확인",defaultValue:defaultQty,type:"number",placeholder:"입고 수량"}
+  );
+  if(qtyText===null)return;
+
+  const qty=Number(String(qtyText).replace(/,/g,""));
+  if(!Number.isFinite(qty)||qty<=0){toast("입고 수량을 올바르게 입력하세요.");return}
+
+  const today=new Date().toISOString().slice(0,10);
+  const receivedDate=await appPrompt(
+    "실제 입고일을 입력하세요. (YYYY-MM-DD)",
+    {title:"입고일 확인",defaultValue:today,placeholder:"YYYY-MM-DD"}
+  );
+  if(receivedDate===null)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(receivedDate.trim())){
+    toast("입고일을 YYYY-MM-DD 형식으로 입력하세요.");
+    return;
+  }
+
+  const memo=await appPrompt(
+    "입고 메모를 입력하세요. (선택)",
+    {title:"입고 메모",multiline:true,defaultValue:"정상 입고"}
+  );
+  if(memo===null)return;
+
+  if(!(await appConfirm(
+    `${request.item_name||"물품"} ${qty.toLocaleString("ko-KR")}${request.unit||""}을 입고 처리할까요?\n재고가 자동 증가하고 구매상태가 구매완료로 변경됩니다.`
+  )))return;
+
+  const {data,error}=await supabaseClient.rpc("confirm_purchase_inventory_receipt",{
+    p_request_id:String(requestId),
+    p_received_quantity:qty,
+    p_received_date:receivedDate.trim(),
+    p_memo:memo.trim()||null
+  });
+
+  if(error){toast("입고 확인 실패: "+error.message);return}
+
+  await Promise.all([loadPurchaseRequests(),loadItems()]);
+  renderPurchases();
+  renderInventory();
+  renderDashboard();
+  renderPendingWorkAlerts(true);
+  toast(`${request.item_name||"물품"} 입고 확인이 완료됐습니다. 재고가 ${qty.toLocaleString("ko-KR")}${request.unit||""} 증가했습니다.`);
+};
 window.deleteInventoryItem=async function(id){
   if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}
   const row=(state.items||[]).find(x=>String(x.id)===String(id));
