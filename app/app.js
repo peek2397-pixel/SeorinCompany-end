@@ -57,35 +57,67 @@ let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notic
 
 const $ = id => document.getElementById(id);
 
-// V108: Electron에서 confirm/저장/삭제 후 현재 창의 클릭 포커스가 잠기는 현상 복구
+// V109: Electron 네이티브 confirm을 사용하지 않고 앱 내부 확인창을 사용합니다.
+// 네이티브 confirm은 닫힌 뒤 현재 창이 클릭되지 않는 Electron 포커스 오류를 만들 수 있습니다.
 function restorePortalInteraction(){
   try{
     document.documentElement.style.pointerEvents="";
     document.body.style.pointerEvents="";
     document.body.classList.remove("interaction-locked","is-loading","busy");
     document.querySelectorAll("[aria-busy='true']").forEach(el=>el.removeAttribute("aria-busy"));
-    document.querySelectorAll(".loading-overlay,.screen-lock,.busy-layer,.modal-backdrop").forEach(el=>{
-      if(!el.classList.contains("org-edit-modal")){
-        el.style.pointerEvents="none";
-        if(el.dataset?.temporaryOverlay==="true")el.style.display="none";
-      }
-    });
     const active=document.activeElement;
-    if(active && typeof active.blur==="function" && (active.tagName==="BUTTON" || active.getAttribute?.("role")==="button"))active.blur();
+    if(active && typeof active.blur==="function")active.blur();
     window.focus();
   }catch(e){console.warn("화면 클릭 복구 실패",e);}
 }
 
-const nativeConfirm=window.confirm.bind(window);
-window.confirm=function(message){
-  let result=false;
-  try{return result=nativeConfirm(message);}
-  finally{
-    requestAnimationFrame(restorePortalInteraction);
-    setTimeout(restorePortalInteraction,30);
-    setTimeout(restorePortalInteraction,180);
-  }
-};
+function appConfirm(message, options={}){
+  return new Promise(resolve=>{
+    document.getElementById("seorinConfirmLayer")?.remove();
+    const layer=document.createElement("div");
+    layer.id="seorinConfirmLayer";
+    layer.style.cssText="position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.38);display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:auto";
+    const dialog=document.createElement("div");
+    dialog.setAttribute("role","dialog");
+    dialog.setAttribute("aria-modal","true");
+    dialog.style.cssText="width:min(430px,calc(100vw - 40px));background:#fff;border-radius:14px;box-shadow:0 24px 80px rgba(15,23,42,.28);padding:22px;font-family:inherit";
+    const title=document.createElement("div");
+    title.textContent=options.title||"확인";
+    title.style.cssText="font-size:18px;font-weight:800;margin-bottom:12px;color:#0f172a";
+    const body=document.createElement("div");
+    body.textContent=String(message||"");
+    body.style.cssText="white-space:pre-wrap;line-height:1.55;color:#334155;margin-bottom:20px";
+    const actions=document.createElement("div");
+    actions.style.cssText="display:flex;justify-content:flex-end;gap:8px";
+    const cancel=document.createElement("button");
+    cancel.type="button"; cancel.textContent=options.cancelText||"취소";
+    cancel.style.cssText="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer";
+    const ok=document.createElement("button");
+    ok.type="button"; ok.textContent=options.okText||"확인";
+    ok.style.cssText=`border:0;background:${options.danger?"#dc2626":"#1677ff"};color:#fff;border-radius:8px;padding:9px 16px;font-weight:800;cursor:pointer`;
+    actions.append(cancel,ok); dialog.append(title,body,actions); layer.append(dialog); document.body.append(layer);
+    let done=false;
+    const finish=value=>{
+      if(done)return; done=true;
+      document.removeEventListener("keydown",onKey,true);
+      layer.remove();
+      restorePortalInteraction();
+      requestAnimationFrame(()=>{restorePortalInteraction(); document.body.focus?.();});
+      setTimeout(restorePortalInteraction,30);
+      resolve(value);
+    };
+    const onKey=e=>{
+      if(e.key==="Escape"){e.preventDefault();finish(false);}
+      if(e.key==="Enter"){e.preventDefault();finish(true);}
+    };
+    document.addEventListener("keydown",onKey,true);
+    cancel.addEventListener("click",()=>finish(false));
+    ok.addEventListener("click",()=>finish(true));
+    layer.addEventListener("mousedown",e=>{if(e.target===layer)finish(false);});
+    setTimeout(()=>ok.focus(),0);
+  });
+}
+window.appConfirm=appConfirm;
 
 window.addEventListener("focus",()=>setTimeout(restorePortalInteraction,0));
 window.addEventListener("pageshow",restorePortalInteraction);
@@ -94,14 +126,11 @@ document.addEventListener("pointerdown",()=>{
   if(document.body.style.pointerEvents==="none" || document.documentElement.style.pointerEvents==="none")restorePortalInteraction();
 },{capture:true});
 
-// 비동기 저장/삭제가 끝난 뒤에도 포커스를 반드시 돌려줌
-const nativeFetch=window.fetch?.bind(window);
-if(nativeFetch){
-  window.fetch=async(...args)=>{
-    try{return await nativeFetch(...args);}
-    finally{setTimeout(restorePortalInteraction,0);}
-  };
-}
+// 저장·삭제 버튼은 작업이 끝나면 항상 포커스를 해제합니다.
+document.addEventListener("click",e=>{
+  const button=e.target?.closest?.("button");
+  if(button)setTimeout(()=>{button.blur?.();restorePortalInteraction();},0);
+},true);
 
 window.addEventListener("error",e=>{
   console.error("화면 스크립트 오류",e.error||e.message);
@@ -349,7 +378,7 @@ function renderDinnerRooms(){
 async function deleteDinnerRoom(roomId){
   const room=(state.dinnerRooms||[]).find(x=>String(x.id)===String(roomId));if(!room)return;
   if(!canDeleteDinnerRoom(room)){toast('방을 만든 사람 또는 최고관리자만 삭제할 수 있습니다.');return;}
-  if(!confirm(`"${room.title}" 회식방을 삭제할까요? 채팅·참여자·게임 결과도 함께 삭제됩니다.`))return;
+  if(!(await appConfirm(`"${room.title}" 회식방을 삭제할까요? 채팅·참여자·게임 결과도 함께 삭제됩니다.`)))return;
   const {error}=await supabaseClient.rpc('delete_dinner_room_secure',{p_room_id:roomId});
   if(error){toast('회식방 삭제 실패: '+String(error.message||error));return;}
   state.dinnerRooms=(state.dinnerRooms||[]).filter(r=>String(r.id)!==String(roomId));
@@ -1222,7 +1251,7 @@ async function deleteMessengerRoom(){
   if(roomId==="global"){toast("전체 소통방은 삭제할 수 없습니다.");return;}
   const room=currentMessengerRoom();
   const roomName=room?.display_name||"대화방";
-  if(!confirm(`'${roomName}' 방을 폭파하시겠습니까?\n메시지와 참여자 정보가 모두 삭제됩니다.`))return;
+  if(!(await appConfirm(`'${roomName}' 방을 폭파하시겠습니까?\n메시지와 참여자 정보가 모두 삭제됩니다.`)))return;
   const btn=$("deleteMessengerRoomBtn");
   if(btn){btn.disabled=true;btn.textContent="삭제 중...";}
   try{
@@ -1631,7 +1660,7 @@ async function saveContractor(){
   if(!row.company_name){toast("외주 업체명을 입력하세요.");return}
   if(row.headcount<0||row.meal_count<0){toast("인원은 0명 이상이어야 합니다.");return}
   if(row.meal_count>row.headcount){
-    if(!confirm("식사 인원이 출근 인원보다 많습니다. 그대로 저장할까요?"))return;
+    if(!(await appConfirm("식사 인원이 출근 인원보다 많습니다. 그대로 저장할까요?")))return;
   }
 
   const editingId=state.editingContractorId;
@@ -1679,7 +1708,7 @@ window.editContractor=function(id){
 };
 
 window.deleteContractor=async function(id){
-  if(!confirm("이 외주 인력 내역을 삭제할까요?"))return;
+  if(!(await appConfirm("이 외주 인력 내역을 삭제할까요?")))return;
   const {error}=await supabaseClient.from("contractor_workforce").delete().eq("id",id);
   if(error){toast("삭제 실패: "+error.message);return}
 
@@ -1826,7 +1855,7 @@ window.deleteCorporateCardExpense=async function(id){
   if(!canDeleteCorporateCardExpense()){toast("관리자만 법인카드 내역을 삭제할 수 있습니다.");return}
   const row=(state.cards||[]).find(x=>String(x.id)===String(id));
   if(!row){toast("삭제할 법인카드 내역을 찾지 못했습니다.");return}
-  if(!confirm(`${row.used_date||""} · ${row.card_owner||""} · ${money(row.amount)} 내역을 삭제할까요?`))return;
+  if(!(await appConfirm(`${row.used_date||""} · ${row.card_owner||""} · ${money(row.amount)} 내역을 삭제할까요?`)))return;
   const {error}=await supabaseClient.from("corporate_card_expenses").delete().eq("id",id);
   if(error){toast("법인카드 내역 삭제 실패: "+error.message);return}
   fastRemoveFromState("cards",id,()=>{renderCards();renderDashboard();});
@@ -1871,7 +1900,7 @@ function renderInventory(){
 window.deleteInventoryItem=async function(id){
   if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}
   const row=(state.items||[]).find(x=>String(x.id)===String(id));
-  if(!confirm(`${row?.name||"이 품목"}을 삭제할까요? 관련 입출고 기록이 있으면 삭제되지 않을 수 있습니다.`))return;
+  if(!(await appConfirm(`${row?.name||"이 품목"}을 삭제할까요? 관련 입출고 기록이 있으면 삭제되지 않을 수 있습니다.`)))return;
   const {error}=await supabaseClient.from("inventory_items").delete().eq("id",id);
   if(error){toast("품목 삭제 실패: "+error.message);return}
   fastRemoveFromState("items",id,()=>{renderInventory();renderDashboard();});toast("품목을 삭제했습니다.");
@@ -1960,7 +1989,7 @@ function purchaseActions(x){
 window.deletePurchaseRequest=async function(id){
   if(!isRecordAdmin()){toast("관리자만 구매 신청을 삭제할 수 있습니다.");return}
   const row=(state.purchaseRequests||[]).find(x=>String(x.id)===String(id));
-  if(!confirm(`${row?.item_name||"이 구매 신청"}을 삭제할까요?`))return;
+  if(!(await appConfirm(`${row?.item_name||"이 구매 신청"}을 삭제할까요?`)))return;
   const {error}=await supabaseClient.from("purchase_requests").delete().eq("id",id);
   if(error){toast("구매 신청 삭제 실패: "+error.message);return}
   fastRemoveFromState("purchaseRequests",id,()=>{renderPurchases();renderDashboard();});toast("구매 신청을 삭제했습니다.");
@@ -1969,7 +1998,7 @@ async function finalCompletePurchase(id){
   if(!isFinalPurchaseApprover()){toast("최종관리자만 완료 처리할 수 있습니다.");return}
   const x=(state.purchaseRequests||[]).find(r=>String(r.id)===String(id));
   if(!x){toast("구매 신청을 찾을 수 없습니다.");return}
-  if(!confirm(`${x.item_name||"구매 건"}을 검토 단계를 생략하고 바로 구매완료 처리하시겠습니까?`))return;
+  if(!(await appConfirm(`${x.item_name||"구매 건"}을 검토 단계를 생략하고 바로 구매완료 처리하시겠습니까?`)))return;
   const {error}=await supabaseClient.rpc("admin_direct_purchase_status",{
     p_request_id:id,
     p_status:"completed",
@@ -2018,7 +2047,7 @@ window.changePurchaseStatus=async function(id,status){
   const msg=direct
     ? `구매담당자 검토를 생략하고 '${label}' 처리할까요?`
     : `이 구매 건을 '${label}' 상태로 변경할까요?`;
-  if(!confirm(msg))return;
+  if(!(await appConfirm(msg)))return;
   const call=direct
     ? supabaseClient.rpc("admin_direct_purchase_status",{p_request_id:id,p_status:status,p_reason:"최고관리자 직접 처리"})
     : supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:status,p_reason:null});
@@ -2047,7 +2076,7 @@ window.completePurchaseUsage=async function(id){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(usageDate.trim())){toast("사용완료일을 YYYY-MM-DD 형식으로 입력하세요.");return}
   const note=prompt("사용 관련 비고가 있으면 입력하세요. (선택)","");
   if(note===null)return;
-  if(!confirm(`사용완료일 ${usageDate.trim()}로 기록할까요?`))return;
+  if(!(await appConfirm(`사용완료일 ${usageDate.trim()}로 기록할까요?`)))return;
   const {error}=await supabaseClient.rpc("complete_purchase_usage",{
     p_request_id:Number(id),
     p_usage_date:usageDate.trim(),
@@ -2089,7 +2118,7 @@ window.deleteNotice=async function(id){
     return;
   }
   const notice=state.notices.find(x=>String(x.id)===String(id));
-  if(!confirm(`공지사항 "${notice?.title||""}"을 삭제할까요?`))return;
+  if(!(await appConfirm(`공지사항 "${notice?.title||""}"을 삭제할까요?`)))return;
 
   const {error}=await supabaseClient.rpc("delete_notice_admin",{p_notice_id:id});
   if(error){
@@ -2476,7 +2505,7 @@ window.editOrgTeam=async function(id){
 
 window.deleteOrgTeam=async function(id){
   const t=state.orgTeams.find(x=>x.id===id);if(!t)return;
-  if(!confirm(`${t.name} 팀을 삭제할까요?`))return;
+  if(!(await appConfirm(`${t.name} 팀을 삭제할까요?`)))return;
 
   const {error}=await supabaseClient.rpc("manage_organization_team",{
     p_action:"delete",
@@ -2795,7 +2824,7 @@ async function createOrResetEmployeeLeaveYear(mode){
   const year=selectedLeaveYear();
   const reason=$("editLeaveYearReason")?.value.trim()||`${year}년 연차·대휴 ${mode==="create"?"생성":"초기화"}`;
   const label=mode==="create"?"새 장부를 생성":"연차·대휴를 초기화";
-  if(!confirm(`${year}년 ${label}하시겠습니까?\n기존 다른 연도 기록은 유지됩니다.`))return;
+  if(!(await appConfirm(`${year}년 ${label}하시겠습니까?\n기존 다른 연도 기록은 유지됩니다.`)))return;
   const btn=mode==="create"?$("createLeaveYearBtn"):$("resetLeaveYearBtn");
   if(btn){btn.disabled=true;btn.textContent="처리 중..."}
   try{
@@ -3319,7 +3348,7 @@ async function saveBusinessTrip(){
   if(end<start){toast("종료일을 확인하세요.");return}
   if(vehicleId){
     const overlap=(state.businessTrips||[]).some(x=>x.vehicle_id===vehicleId&&start<=x.end_date&&end>=x.start_date);
-    if(overlap&&!confirm("선택 차량이 같은 기간에 이미 지정되어 있습니다. 그래도 저장할까요?"))return;
+    if(overlap&&!(await appConfirm("선택 차량이 같은 기간에 이미 지정되어 있습니다. 그래도 저장할까요?")))return;
   }
   const vehicle=state.vehicles.find(v=>String(v.id)===String(vehicleId));
   const row={trip_type:$("businessTripType").value,employee_ids:employees.map(x=>x.id),employee_names:employees.map(x=>x.name),start_date:start,end_date:end,destination:$("businessTripDestination").value.trim(),purpose:$("businessTripPurpose").value.trim(),vehicle_id:vehicleId,vehicle_number:vehicle?.vehicle_number||null,driver_name:$("businessTripDriver").value.trim(),exclude_meal:$("businessTripExcludeMeal").checked,memo:$("businessTripMemo").value.trim(),created_by:state.user.id,created_by_name:state.profile?.name||""};
@@ -3331,7 +3360,7 @@ async function saveBusinessTrip(){
   await Promise.all([loadBusinessTrips(),loadCalendarEntries()]);renderBusinessTrips();renderCalendar();renderDashboard();clearBusinessTrip();toast("출장을 등록했습니다. 출장 기간 식사 인원에서 자동 제외됩니다.");
 }
 function clearBusinessTrip(){["businessTripDestination","businessTripPurpose","businessTripDriver","businessTripMemo"].forEach(id=>{if($(id))$(id).value=""});state.tripEmployeeNames=[];renderTripEmployeeTags();if($("businessTripVehicle"))$("businessTripVehicle").value="";if($("businessTripStart"))$("businessTripStart").value=isoDateOffset(0);if($("businessTripEnd"))$("businessTripEnd").value=isoDateOffset(0);}
-window.deleteBusinessTrip=async id=>{if(!confirm("이 출장을 삭제할까요? 달력의 출장 일정도 함께 삭제됩니다."))return;await supabaseClient.from("work_calendar_entries").delete().eq("business_trip_id",id);const {error}=await supabaseClient.from("business_trips").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("businessTrips",id,()=>{renderBusinessTrips();renderCalendar();renderDashboard();});toast("출장을 삭제했습니다.")}
+window.deleteBusinessTrip=async id=>{if(!(await appConfirm("이 출장을 삭제할까요? 달력의 출장 일정도 함께 삭제됩니다.")))return;await supabaseClient.from("work_calendar_entries").delete().eq("business_trip_id",id);const {error}=await supabaseClient.from("business_trips").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("businessTrips",id,()=>{renderBusinessTrips();renderCalendar();renderDashboard();});toast("출장을 삭제했습니다.")}
 
 function isAssetAdmin(){
   return !!(has("vehicles_manage")||state.profile?.is_super_admin);
@@ -3407,7 +3436,7 @@ async function saveTransportVehicle(){if(!has("vehicles_manage")&&!state.profile
 async function saveTransportMaintenance(){const vehicleId=$("transportMaintenanceVehicle").value;if(!vehicleId){toast("차량을 선택하세요.");return}const reporter=state.profile?.name||"";const status=reporter==="엄수현"?"manager_review":"final_review";const row={vehicle_id:vehicleId,maintenance_date:$("transportMaintenanceDate").value,maintenance_type:$("transportMaintenanceType").value,mileage_km:Number($("transportMaintenanceMileage").value||0),shop_name:$("transportMaintenanceShop").value.trim(),cost:Number($("transportMaintenanceCost").value||0),next_due_date:$("transportMaintenanceNextDate").value||null,next_due_mileage:Number($("transportMaintenanceNextMileage").value||0)||null,memo:$("transportMaintenanceMemo").value.trim(),reported_by:state.user.id,reported_by_name:reporter,workflow_status:status,updated_at:new Date().toISOString()};const {error}=await supabaseClient.from("vehicle_maintenance").insert(row);if(error){toast("정비 등록 실패: "+error.message);return}await loadVehicleMaintenance();renderTransport();renderPendingWorkAlerts(true);toast(status==="manager_review"?"신태선 대리에게 1차 결재가 전달됩니다.":"손동오 관리자에게 최종 결재가 전달됩니다.")}
 function transportWorkflowLabel(v){return ({manager_review:"신태선 결재대기",final_review:"손동오 결재대기",approved:"결재완료",rejected:"반려"})[v]||vehicleWorkflowLabel(v)}
 function transportMaintenanceActions(x){const a=[];if(currentUserIs("신태선")&&x.workflow_status==="manager_review")a.push(`<button class="btn small primary" onclick="transportManagerApprove('${x.id}',true)">결재</button><button class="btn small danger" onclick="transportManagerApprove('${x.id}',false)">반려</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="final_review")a.push(`<button class="btn small primary" onclick="approveMaintenance('vehicle','${x.id}',true)">최종결재</button><button class="btn small danger" onclick="approveMaintenance('vehicle','${x.id}',false)">반려</button>`);return a.join(" ")||"-"}
-window.transportManagerApprove=async(id,approved)=>{if(!confirm(approved?"1차 결재하시겠습니까?":"반려하시겠습니까?"))return;const {error}=await supabaseClient.from("vehicle_maintenance").update({workflow_status:approved?"final_review":"rejected",manager_approved_by:state.user.id,manager_approved_by_name:state.profile?.name||"신태선",manager_approved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("처리 실패: "+error.message);return}await loadVehicleMaintenance();renderTransport();renderPendingWorkAlerts(true);toast(approved?"손동오 관리자에게 최종 결재가 전달됩니다.":"반려했습니다.")}
+window.transportManagerApprove=async(id,approved)=>{if(!(await appConfirm(approved?"1차 결재하시겠습니까?":"반려하시겠습니까?")))return;const {error}=await supabaseClient.from("vehicle_maintenance").update({workflow_status:approved?"final_review":"rejected",manager_approved_by:state.user.id,manager_approved_by_name:state.profile?.name||"신태선",manager_approved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("처리 실패: "+error.message);return}await loadVehicleMaintenance();renderTransport();renderPendingWorkAlerts(true);toast(approved?"손동오 관리자에게 최종 결재가 전달됩니다.":"반려했습니다.")}
 
 async function loadVehicles(){const {data}=await supabaseClient.from("fleet_vehicles").select("*").order("vehicle_name");state.vehicles=data||[];if(!state.selectedVehicleId&&state.vehicles[0])state.selectedVehicleId=state.vehicles[0].id}
 async function loadVehicleInspections(){const {data,error}=await supabaseClient.from("vehicle_inspections").select("*").order("completed_date",{ascending:false});if(error){console.warn("자동차 검사 이력 조회",error.message);state.vehicleInspections=[];return}state.vehicleInspections=data||[]}
@@ -3422,12 +3451,12 @@ function renderCompanyEvents(){if(!$("companyEventTable"))return;const month=$("
 function eventTypeLabel(t){return ({b2c:"B2C 행사",company:"회사 일정",education:"교육",cleanup:"창고 정리",dinner:"회식",other:"기타"})[t]||t}
 async function saveCompanyEvent(){if(!has("calendar_manage")){toast("달력 관리자만 등록할 수 있습니다.");return}const row={event_type:$("eventType").value,title:$("eventTitle").value.trim(),start_date:$("eventStartDate").value,end_date:$("eventEndDate").value||$("eventStartDate").value,event_time:$("eventTime").value.trim(),manager_name:$("eventManager").value.trim(),participant_count:Number($("eventParticipants").value||0),location:$("eventLocation").value.trim(),memo:$("eventMemo").value.trim(),created_by:state.user.id};if(!row.title||!row.start_date){toast("행사명과 시작일을 입력하세요.");return}const {error}=await supabaseClient.from("company_events").insert(row);if(error){toast("일정 저장 실패: "+error.message);return}await loadCompanyEvents();clearCompanyEvent();renderCompanyEvents();renderCalendar();renderDashboard();toast("회사 일정을 저장했습니다.")}
 function clearCompanyEvent(){["eventTitle","eventTime","eventManager","eventLocation","eventMemo"].forEach(id=>$(id).value="");$("eventParticipants").value=0;$("eventStartDate").value=isoDateOffset(0);$("eventEndDate").value=isoDateOffset(0)}
-window.deleteCompanyEvent=async id=>{if(!confirm("이 일정을 삭제할까요?"))return;const {error}=await supabaseClient.from("company_events").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("companyEvents",id,()=>{renderCompanyEvents();renderCalendar();renderDashboard();});toast("일정을 삭제했습니다.")}
+window.deleteCompanyEvent=async id=>{if(!(await appConfirm("이 일정을 삭제할까요?")))return;const {error}=await supabaseClient.from("company_events").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("companyEvents",id,()=>{renderCompanyEvents();renderCalendar();renderDashboard();});toast("일정을 삭제했습니다.")}
 
 function renderMeetings(){if(!$("meetingTable"))return;const month=$("meetingMonthFilter").value||isoDateOffset(0).slice(0,7);const rows=state.meetingBookings.filter(x=>String(x.meeting_date).startsWith(month));$("meetingTable").innerHTML=tableHtml(["날짜","시간","미팅명","예약자","누구와","참석자","관리"],rows.map(x=>[x.meeting_date,`${String(x.start_time).slice(0,5)}~${String(x.end_time).slice(0,5)}`,x.title,x.organizer_name||"",x.meeting_with||"",x.attendees||"",isRecordAdmin()?`<button class="btn small danger" onclick="deleteMeeting('${x.id}')">취소</button>`:"-"]));const end=isoDateOffset(1);$("meetingTodayList").innerHTML=state.meetingBookings.filter(x=>x.meeting_date>=isoDateOffset(0)&&x.meeting_date<=end).map(x=>`<div class="list-item"><b>${x.meeting_date===isoDateOffset(0)?"오늘":"내일"} ${String(x.start_time).slice(0,5)} · ${escapeHtml(x.title)}</b><small>${escapeHtml(x.organizer_name||"")} · ${escapeHtml(x.meeting_with||"")}</small></div>`).join("")||`<div class="empty">오늘·내일 예약이 없습니다.</div>`}
 async function saveMeeting(){const row={room_name:$("meetingRoom").value,meeting_date:$("meetingDate").value,start_time:$("meetingStart").value,end_time:$("meetingEnd").value,title:$("meetingTitle").value.trim(),organizer_name:$("meetingOrganizer").value.trim()||state.profile.name,meeting_with:$("meetingWith").value.trim(),attendees:$("meetingAttendees").value.trim(),memo:$("meetingMemo").value.trim(),created_by:state.user.id};if(!row.meeting_date||!row.start_time||!row.end_time||!row.title){toast("날짜, 시간, 미팅명을 입력하세요.");return}if(row.start_time>=row.end_time){toast("종료시간은 시작시간보다 늦어야 합니다.");return}const overlap=state.meetingBookings.some(x=>x.room_name===row.room_name&&x.meeting_date===row.meeting_date&&row.start_time<String(x.end_time).slice(0,5)&&row.end_time>String(x.start_time).slice(0,5));if(overlap){toast("이미 예약된 시간과 겹칩니다.");return}const {error}=await supabaseClient.from("meeting_room_bookings").insert(row);if(error){toast("예약 실패: "+error.message);return}await loadMeetingBookings();clearMeeting();renderMeetings();renderDashboard();toast("회의실을 예약했습니다.")}
 function clearMeeting(){["meetingTitle","meetingWith","meetingAttendees","meetingMemo"].forEach(id=>$(id).value="");$("meetingDate").value=isoDateOffset(0);$("meetingStart").value="09:00";$("meetingEnd").value="10:00";$("meetingOrganizer").value=state.profile?.name||""}
-window.deleteMeeting=async id=>{if(!confirm("예약을 취소할까요?"))return;const {error}=await supabaseClient.from("meeting_room_bookings").delete().eq("id",id);if(error){toast("취소 실패: "+error.message);return}fastRemoveFromState("meetingBookings",id,()=>{renderMeetings();renderDashboard();});toast("예약을 취소했습니다.")}
+window.deleteMeeting=async id=>{if(!(await appConfirm("예약을 취소할까요?")))return;const {error}=await supabaseClient.from("meeting_room_bookings").delete().eq("id",id);if(error){toast("취소 실패: "+error.message);return}fastRemoveFromState("meetingBookings",id,()=>{renderMeetings();renderDashboard();});toast("예약을 취소했습니다.")}
 
 
 function dateOnlyToday(){return new Date().toISOString().slice(0,10)}
@@ -3487,11 +3516,11 @@ window.selectVehicle=id=>{state.selectedVehicleId=id;if($("tripVehicle"))$("trip
 window.editVehicle=id=>{if(!isAssetAdmin()){toast("관리자만 수정할 수 있습니다.");return;}const v=state.vehicles.find(x=>x.id===id);if(!v)return;setAssetAdminMode(false);state.assetAdminSectionOpen=true;state.selectedVehicleId=id;state.editingVehicleId=id;state.vehicleViewGroup=v.vehicle_group||"company";$("vehicleGroup").value=v.vehicle_group||"company";$("vehicleTonnage").value=v.tonnage||"";$("vehicleName").value=v.vehicle_name||"";$("vehicleNumber").value=v.vehicle_number||"";$("vehicleManager").value=v.manager_name||"";$("vehicleMileage").value=v.current_mileage||0;$("vehicleLastInspection").value=v.last_inspection_date||"";$("vehicleInspection").value=v.inspection_expiry||"";$("vehicleStatus").value=v.status||"운행가능";$("vehicleMemo").value=v.memo||"";activateVehicleTab("basic")}
 function clearVehicle(){state.editingVehicleId=null;["vehicleName","vehicleNumber","vehicleManager","vehicleLastInspection","vehicleInspection","vehicleMemo"].forEach(id=>{if($(id))$(id).value=""});$("vehicleMileage").value=0;$("vehicleStatus").value="운행가능";if($("vehicleGroup"))$("vehicleGroup").value=state.vehicleViewGroup||"company";if($("vehicleTonnage"))$("vehicleTonnage").value=""}
 async function saveVehicle(){if(!has("vehicles_manage")&&!state.profile?.is_super_admin){toast("차량 관리 권한이 필요합니다.");return}const row={vehicle_group:$("vehicleGroup")?.value||"company",tonnage:$("vehicleTonnage")?.value||null,vehicle_name:$("vehicleName").value.trim(),vehicle_number:$("vehicleNumber").value.trim(),manager_name:$("vehicleManager").value.trim(),current_mileage:Number($("vehicleMileage").value||0),last_inspection_date:$("vehicleLastInspection").value||null,inspection_expiry:$("vehicleInspection").value||null,status:$("vehicleStatus").value,memo:$("vehicleMemo").value.trim(),updated_at:new Date().toISOString()};if(!row.vehicle_name||!row.vehicle_number){toast("차량명과 차량번호를 입력하세요.");return}let error;if(state.editingVehicleId)({error}=await supabaseClient.from("fleet_vehicles").update(row).eq("id",state.editingVehicleId));else ({error}=await supabaseClient.from("fleet_vehicles").upsert(row,{onConflict:"vehicle_number"}));if(error){toast("차량 저장 실패: "+error.message);return}state.vehicleViewGroup=row.vehicle_group||"company";await loadVehicles();clearVehicle();renderVehicles();toast("차량 정보를 저장했습니다.")}
-async function deleteSelectedVehicle(){const v=selectedVehicle();if(!v){toast("삭제할 차량을 선택하세요.");return}if(!has("vehicles_manage")&&!state.profile?.is_super_admin){toast("차량 관리 권한이 필요합니다.");return}if(!confirm(`${v.vehicle_name} ${v.vehicle_number} 차량과 연결된 운행·정비 기록을 모두 삭제할까요?`))return;const {error}=await supabaseClient.from("fleet_vehicles").delete().eq("id",v.id);if(error){toast("차량 삭제 실패: "+error.message);return}state.selectedVehicleId=null;await Promise.all([loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance()]);renderVehicles();clearVehicle();toast("차량을 삭제했습니다.")}
+async function deleteSelectedVehicle(){const v=selectedVehicle();if(!v){toast("삭제할 차량을 선택하세요.");return}if(!has("vehicles_manage")&&!state.profile?.is_super_admin){toast("차량 관리 권한이 필요합니다.");return}if(!(await appConfirm(`${v.vehicle_name} ${v.vehicle_number} 차량과 연결된 운행·정비 기록을 모두 삭제할까요?`)))return;const {error}=await supabaseClient.from("fleet_vehicles").delete().eq("id",v.id);if(error){toast("차량 삭제 실패: "+error.message);return}state.selectedVehicleId=null;await Promise.all([loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance()]);renderVehicles();clearVehicle();toast("차량을 삭제했습니다.")}
 
 function clearVehicleInspection(){if($("inspectionCompletedDate"))$("inspectionCompletedDate").value=dateOnlyToday();if($("inspectionNextExpiry"))$("inspectionNextExpiry").value="";if($("inspectionAgency"))$("inspectionAgency").value="";if($("inspectionMemo"))$("inspectionMemo").value=""}
 function renderVehicleInspectionPanel(){if(!$("inspectionVehicle"))return;const vehicles=visibleVehicles();const opts=vehicles.map(v=>`<option value="${v.id}">${escapeHtml(v.vehicle_name)} ${escapeHtml(v.vehicle_number)}</option>`).join("");$("inspectionVehicle").innerHTML=opts;if(state.selectedVehicleId&&vehicles.some(v=>v.id===state.selectedVehicleId))$("inspectionVehicle").value=state.selectedVehicleId;else if(vehicles[0]){state.selectedVehicleId=vehicles[0].id;$("inspectionVehicle").value=vehicles[0].id}const v=selectedVehicle();const info=v?vehicleInspectionInfo(v):null;$("vehicleInspectionCurrent").innerHTML=v?`<div class="inspection-summary"><b>${escapeHtml(v.vehicle_name)} ${escapeHtml(v.vehicle_number)}</b><span>최근 완료일 ${escapeHtml(v.last_inspection_date||"미등록")}</span><span>현재 만료일 ${escapeHtml(v.inspection_expiry||"미등록")}</span><strong class="inspection-${info.level}">${escapeHtml(info.label)}</strong></div>`:`<div class="empty">차량을 선택하세요.</div>`;const alerts=getVehicleInspectionAlerts().filter(a=>vehicles.some(vv=>vv.id===a.vehicle.id));$("vehicleInspectionAlertList").innerHTML=alerts.map(a=>`<div class="list-item inspection-notice ${a.level}"><b>${escapeHtml(a.title)}</b><small>${escapeHtml(a.detail)}</small><button class="btn small" onclick="openVehicleInspection('${a.vehicle.id}')">처리</button></div>`).join("")||`<div class="empty">검사 예정 차량이 없습니다.</div>`;const ids=new Set(vehicles.map(v=>v.id));const rows=(state.vehicleInspections||[]).filter(x=>ids.has(x.vehicle_id));$("vehicleInspectionHistory").innerHTML=tableHtml(["완료일","차량","다음 만료일","검사기관","완료자","비고","관리"],rows.map(x=>[x.completed_date,vehicleLabel(x.vehicle_id),x.next_expiry_date,x.agency||"-",x.completed_by_name||"-",x.memo||"",isRecordAdmin()?`<button class="btn small danger" onclick="deleteVehicleInspection('${x.id}')">삭제</button>`:"-"]))}
-window.deleteVehicleInspection=async function(id){if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}if(!confirm("이 자동차 검사 이력을 삭제할까요?"))return;const {error}=await supabaseClient.from("vehicle_inspections").delete().eq("id",id);if(error){toast("검사 이력 삭제 실패: "+error.message);return}fastRemoveFromState("vehicleInspections",id,renderVehicles);toast("자동차 검사 이력을 삭제했습니다.") }
+window.deleteVehicleInspection=async function(id){if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}if(!(await appConfirm("이 자동차 검사 이력을 삭제할까요?")))return;const {error}=await supabaseClient.from("vehicle_inspections").delete().eq("id",id);if(error){toast("검사 이력 삭제 실패: "+error.message);return}fastRemoveFromState("vehicleInspections",id,renderVehicles);toast("자동차 검사 이력을 삭제했습니다.") }
 async function completeVehicleInspection(){const vehicleId=$("inspectionVehicle").value;const completedDate=$("inspectionCompletedDate").value;const nextExpiry=$("inspectionNextExpiry").value;if(!vehicleId||!completedDate||!nextExpiry){toast("차량, 검사 완료일, 다음 검사 만료일을 입력하세요.");return}if(nextExpiry<=completedDate){toast("다음 검사 만료일은 완료일보다 뒤여야 합니다.");return}const row={vehicle_id:vehicleId,completed_date:completedDate,next_expiry_date:nextExpiry,agency:$("inspectionAgency").value.trim(),memo:$("inspectionMemo").value.trim(),completed_by:state.user.id,completed_by_name:state.profile?.name||"",created_at:new Date().toISOString()};const {error}=await supabaseClient.from("vehicle_inspections").insert(row);if(error){toast("검사 완료 저장 실패: "+error.message);return}const {error:updateError}=await supabaseClient.from("fleet_vehicles").update({last_inspection_date:completedDate,inspection_expiry:nextExpiry,updated_at:new Date().toISOString()}).eq("id",vehicleId);if(updateError){toast("차량 만료일 갱신 실패: "+updateError.message);return}state.selectedVehicleId=vehicleId;await Promise.all([loadVehicles(),loadVehicleInspections()]);clearVehicleInspection();renderVehicles();renderDashboard();toast("자동차 검사 완료 처리했습니다. 다음 만료일까지 자동 표시됩니다.")}
 
 function clearVehicleTrip(){
@@ -3547,7 +3576,7 @@ window.editVehicleTrip=id=>{
   $("tripStartOdometer").value=startKm;$("tripEndOdometer").value=endKm;$("tripDistance").value=x.distance_km||Math.max(0,endKm-startKm);
   $("tripFuelCost").value=x.fuel_cost||0;$("tripMemo").value=x.memo||"";activateVehicleTab("trip");
 }
-window.deleteVehicleTrip=async id=>{if(!confirm("이 운행일지를 삭제할까요?"))return;const {error}=await supabaseClient.from("vehicle_trip_logs").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("vehicleTrips",id,renderVehicles);toast("운행일지를 삭제했습니다.")}
+window.deleteVehicleTrip=async id=>{if(!(await appConfirm("이 운행일지를 삭제할까요?")))return;const {error}=await supabaseClient.from("vehicle_trip_logs").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("vehicleTrips",id,renderVehicles);toast("운행일지를 삭제했습니다.")}
 function renderVehicleTrips(){
   if(!$("vehicleTripTable"))return;
   const month=$("tripMonthFilter")?.value||isoDateOffset(0).slice(0,7);
@@ -3572,12 +3601,12 @@ async function saveVehicleMaintenance(){
   if(error){toast("정비 보고 저장 실패: "+error.message);return}state.selectedVehicleId=row.vehicle_id;await loadVehicleMaintenance();clearVehicleMaintenance();renderVehicles();renderPendingWorkAlerts(true);toast("정비 보고가 등록되었습니다. 김헌정 주임에게 금액 확인 알림이 전달됩니다.")
 }
 window.editVehicleMaintenance=id=>{const x=state.vehicleMaintenance.find(r=>String(r.id)===String(id));if(!x)return;state.editingMaintenanceId=id;state.selectedVehicleId=x.vehicle_id;$("maintenanceVehicle").value=x.vehicle_id;$("maintenanceDate").value=x.maintenance_date;$("maintenanceType").value=x.maintenance_type;$("maintenanceMileage").value=x.mileage_km||0;$("maintenanceShop").value=x.shop_name||"";$("maintenanceCost").value=x.cost||0;$("maintenanceNextDate").value=x.next_due_date||"";$("maintenanceNextMileage").value=x.next_due_mileage||0;$("maintenanceMemo").value=x.memo||"";activateVehicleTab("maintenance")}
-window.deleteVehicleMaintenance=async id=>{if(!confirm("이 정비 내역을 삭제할까요?"))return;const {error}=await supabaseClient.from("vehicle_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("vehicleMaintenance",id,renderVehicles);toast("정비 내역을 삭제했습니다.")}
+window.deleteVehicleMaintenance=async id=>{if(!(await appConfirm("이 정비 내역을 삭제할까요?")))return;const {error}=await supabaseClient.from("vehicle_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("vehicleMaintenance",id,renderVehicles);toast("정비 내역을 삭제했습니다.")}
 function vehicleWorkflowLabel(v){return ({reported:"금액확인 대기",amount_checked:"최종결재 대기",approved:"결재완료",rejected:"반려"})[v]||v||"보고"}
 function vehicleMaintenanceActions(x){const a=[];if(currentUserIs("김헌정")&&(x.workflow_status||"reported")==="reported")a.push(`<button class="btn small primary" onclick="checkMaintenanceAmount('vehicle','${x.id}')">금액 확인</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="amount_checked"){a.push(`<button class="btn small primary" onclick="approveMaintenance('vehicle','${x.id}',true)">결재</button>`);a.push(`<button class="btn small danger" onclick="approveMaintenance('vehicle','${x.id}',false)">반려</button>`)}if(x.reported_by===state.user.id||isRecordAdmin())a.push(`<button class="btn small" onclick="editVehicleMaintenance('${x.id}')">수정</button>`);if(isRecordAdmin())a.push(`<button class="btn small danger" onclick="deleteVehicleMaintenance('${x.id}')">삭제</button>`);return a.join(" ")||"-"}
 async function checkMaintenanceAmount(kind,id){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";const list=kind==="forklift"?state.forkliftMaintenance:state.vehicleMaintenance;const x=list.find(r=>String(r.id)===String(id));const amount=prompt("확인할 금액을 입력하세요.",String(x?.cost||0));if(amount===null)return;const value=Number(String(amount).replace(/,/g,""));if(!Number.isFinite(value)||value<0){toast("금액을 확인하세요.");return}const {error}=await supabaseClient.from(table).update({cost:value,workflow_status:"amount_checked",amount_checked_by:state.user.id,amount_checked_by_name:state.profile?.name||"김헌정",amount_checked_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("금액 확인 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts(true);toast("금액 확인을 완료했습니다. 손동오 관리자에게 최종 결재 알림이 전달됩니다.")}
 window.checkMaintenanceAmount=checkMaintenanceAmount;
-async function approveMaintenance(kind,id,approved){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";if(!confirm(approved?"최종 결재하시겠습니까?":"반려하시겠습니까?"))return;const {error}=await supabaseClient.from(table).update({workflow_status:approved?"approved":"rejected",approved_by:state.user.id,approved_by_name:state.profile?.name||"손동오",approved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("처리 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts();toast(approved?"최종 결재했습니다.":"반려했습니다.")}
+async function approveMaintenance(kind,id,approved){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";if(!(await appConfirm(approved?"최종 결재하시겠습니까?":"반려하시겠습니까?")))return;const {error}=await supabaseClient.from(table).update({workflow_status:approved?"approved":"rejected",approved_by:state.user.id,approved_by_name:state.profile?.name||"손동오",approved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("처리 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts();toast(approved?"최종 결재했습니다.":"반려했습니다.")}
 window.approveMaintenance=approveMaintenance;
 function renderVehicleMaintenance(){if(!$("vehicleMaintenanceTable"))return;const month=$("maintenanceMonthFilter")?.value||isoDateOffset(0).slice(0,7);const visibleIds=new Set(visibleVehicles().map(v=>v.id));const rows=state.vehicleMaintenance.filter(x=>visibleIds.has(x.vehicle_id)&&(!state.selectedVehicleId||x.vehicle_id===state.selectedVehicleId)&&String(x.maintenance_date).startsWith(month));$("vehicleMaintenanceTable").innerHTML=tableHtml(["정비일","차량","항목","주행거리","업체","금액","다음 예정","상태","처리정보","관리"],rows.map(x=>[x.maintenance_date,vehicleLabel(x.vehicle_id),x.maintenance_type,`${Number(x.mileage_km||0).toLocaleString()}km`,x.shop_name||"",money(x.cost),x.next_due_date||((x.next_due_mileage||"")+"km"),vehicleWorkflowLabel(x.workflow_status),`보고 ${x.reported_by_name||"-"}<br>금액확인 ${x.amount_checked_by_name||"-"}<br>결재 ${x.approved_by_name||"-"}`,vehicleMaintenanceActions(x)]))}
 function vehicleLabel(id){const v=state.vehicles.find(x=>String(x.id)===String(id));return v?`${v.vehicle_name} ${v.vehicle_number}`:"차량"}
@@ -3653,10 +3682,10 @@ function clearForkliftMaintenance(){state.editingForkliftMaintenanceId=null;["fo
 async function saveForkliftMaintenance(){const row={forklift_id:$("forkliftMaintenanceAsset").value,maintenance_date:$("forkliftMaintenanceDate").value,maintenance_type:$("forkliftMaintenanceType").value,operating_hours:Number($("forkliftMaintenanceHours").value||0),shop_name:$("forkliftMaintenanceShop").value.trim(),cost:Number($("forkliftMaintenanceCost").value||0),next_due_date:$("forkliftMaintenanceNextDate").value||null,next_due_hours:Number($("forkliftMaintenanceNextHours").value||0)||null,memo:$("forkliftMaintenanceMemo").value.trim(),reported_by:state.user.id,reported_by_name:state.profile?.name||"",workflow_status:"reported",updated_at:new Date().toISOString()};if(!row.forklift_id||!row.maintenance_date){toast("지게차와 작업일을 입력하세요.");return}let error;if(state.editingForkliftMaintenanceId)({error}=await supabaseClient.from("forklift_maintenance").update(row).eq("id",state.editingForkliftMaintenanceId));else({error}=await supabaseClient.from("forklift_maintenance").insert(row));if(error){toast("지게차 정비 보고 실패: "+error.message);return}if(row.maintenance_type==="증류수 보충")await supabaseClient.from("forklift_assets").update({last_distilled_water_date:row.maintenance_date,current_hours:row.operating_hours,updated_at:new Date().toISOString()}).eq("id",row.forklift_id);else await supabaseClient.from("forklift_assets").update({current_hours:row.operating_hours,updated_at:new Date().toISOString()}).eq("id",row.forklift_id);await Promise.all([loadForkliftAssets(),loadForkliftMaintenance()]);clearForkliftMaintenance();renderForklifts();renderPendingWorkAlerts(true);toast("지게차 작업 보고가 등록되었습니다. 김헌정 주임에게 금액 확인 알림이 전달됩니다.")}
 window.editForkliftMaintenance=id=>{const x=state.forkliftMaintenance.find(v=>String(v.id)===String(id));if(!x)return;state.editingForkliftMaintenanceId=id;$("forkliftMaintenanceAsset").value=x.forklift_id;$("forkliftMaintenanceDate").value=x.maintenance_date;$("forkliftMaintenanceType").value=x.maintenance_type;$("forkliftMaintenanceHours").value=x.operating_hours||0;$("forkliftMaintenanceShop").value=x.shop_name||"";$("forkliftMaintenanceCost").value=x.cost||0;$("forkliftMaintenanceNextDate").value=x.next_due_date||"";$("forkliftMaintenanceNextHours").value=x.next_due_hours||0;$("forkliftMaintenanceMemo").value=x.memo||""}
 function forkliftMaintenanceActions(x){const a=[];if(currentUserIs("김헌정")&&(x.workflow_status||"reported")==="reported")a.push(`<button class="btn small primary" onclick="checkMaintenanceAmount('forklift','${x.id}')">금액 확인</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="amount_checked"){a.push(`<button class="btn small primary" onclick="approveMaintenance('forklift','${x.id}',true)">결재</button>`);a.push(`<button class="btn small danger" onclick="approveMaintenance('forklift','${x.id}',false)">반려</button>`)}if(x.reported_by===state.user.id||isRecordAdmin())a.push(`<button class="btn small" onclick="editForkliftMaintenance('${x.id}')">수정</button>`);if(isRecordAdmin())a.push(`<button class="btn small danger" onclick="deleteForkliftMaintenance('${x.id}')">삭제</button>`);return a.join(" ")||"-"}
-window.deleteForklift=async function(id){if(!has("vehicles_manage")){toast("관리자만 삭제할 수 있습니다.");return}if(!confirm("이 지게차를 삭제할까요?"))return;const {error}=await supabaseClient.from("forklift_assets").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("forkliftAssets",id,renderForklifts);toast("지게차를 삭제했습니다.")}
+window.deleteForklift=async function(id){if(!has("vehicles_manage")){toast("관리자만 삭제할 수 있습니다.");return}if(!(await appConfirm("이 지게차를 삭제할까요?")))return;const {error}=await supabaseClient.from("forklift_assets").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("forkliftAssets",id,renderForklifts);toast("지게차를 삭제했습니다.")}
 function forkliftCard(x){const electric=(x.equipment_type||"전동")==="전동";return `<article class="vehicle-card"><div class="vehicle-card-head"><b>${escapeHtml(x.asset_name)}</b><span class="badge">${escapeHtml(x.equipment_type||"전동")}</span></div><small>담당 ${escapeHtml(x.manager_name||"-")}</small><div class="vehicle-card-metrics"><span>가동 ${Number(x.current_hours||0).toLocaleString()}시간</span><span>${electric?`증류수 ${escapeHtml(x.last_distilled_water_date||"미등록")}`:"디젤 정비대상"}</span></div><div class="inline-actions">${isAssetAdmin()?`<button class="btn small" onclick="editForklift('${x.id}')">수정</button><button class="btn small danger" onclick="deleteForklift('${x.id}')">삭제</button>`:""}</div></article>`}
 
-window.deleteForkliftMaintenance=async function(id){if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}if(!confirm("이 지게차 정비 이력을 삭제할까요?"))return;const {error}=await supabaseClient.from("forklift_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("forkliftMaintenance",id,renderForklifts);toast("지게차 정비 이력을 삭제했습니다.")};
+window.deleteForkliftMaintenance=async function(id){if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}if(!(await appConfirm("이 지게차 정비 이력을 삭제할까요?")))return;const {error}=await supabaseClient.from("forklift_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("forkliftMaintenance",id,renderForklifts);toast("지게차 정비 이력을 삭제했습니다.")};
 function renderForklifts(){if(!$("forkliftAssetCards"))return;const admin=isAssetAdmin();const mt=$("forkliftManageToggleBtn");if(mt)mt.style.display=admin?"":"none";if(!admin)$("forkliftManagePanel")?.classList.add("hidden");const opts=state.forkliftAssets.map(x=>`<option value="${x.id}">${escapeHtml(x.location)} · ${escapeHtml(x.asset_name)}</option>`).join("");$("forkliftMaintenanceAsset").innerHTML=opts;const locations=["종합물류","3물류"];$("forkliftAssetCards").innerHTML=locations.map(loc=>{const rows=state.forkliftAssets.filter(x=>x.location===loc);const electric=rows.filter(x=>(x.equipment_type||"전동")==="전동");const diesel=rows.filter(x=>x.equipment_type==="디젤");return `<section class="forklift-location"><h3>${loc}</h3><h4>전동지게차 (${electric.length}대)</h4><div class="vehicle-card-grid">${electric.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div><h4>디젤지게차 (${diesel.length}대)</h4><div class="vehicle-card-grid">${diesel.map(forkliftCard).join("")||`<div class="empty">등록 없음</div>`}</div></section>`}).join("");$("forkliftMaintenanceTable").innerHTML=tableHtml(["작업일","지게차","항목","가동시간","증류수 보충일","업체","금액","다음 기준","상태","처리정보","관리"],state.forkliftMaintenance.map(x=>{const a=state.forkliftAssets.find(v=>String(v.id)===String(x.forklift_id));return[x.maintenance_date,forkliftLabel(x.forklift_id),x.maintenance_type,`${Number(x.operating_hours||0).toLocaleString()}시간`,x.maintenance_type==="증류수 보충"?x.maintenance_date:(a?.last_distilled_water_date||"-"),x.shop_name||"",money(x.cost),x.next_due_date||((x.next_due_hours||"")+"시간"),vehicleWorkflowLabel(x.workflow_status),`보고 ${x.reported_by_name||"-"}<br>금액확인 ${x.amount_checked_by_name||"-"}<br>결재 ${x.approved_by_name||"-"}`,forkliftMaintenanceActions(x)]}))}
 
 const TEST_DATA_CATEGORIES={
@@ -3706,7 +3735,7 @@ function toggleAllTestDataRecords(){
 async function deleteSelectedTestData(){
   if(!testDataSelection.table||!testDataSelection.selected.size){toast("삭제할 자료를 선택하세요.");return;}
   const label=TEST_DATA_CATEGORIES[testDataSelection.table]?.label||"입력자료";
-  if(!confirm(`${label} ${testDataSelection.selected.size}건을 삭제할까요?`))return;
+  if(!(await appConfirm(`${label} ${testDataSelection.selected.size}건을 삭제할까요?`)))return;
   const ids=[...testDataSelection.selected];
   const {error}=await supabaseClient.from(testDataSelection.table).delete().in('id',ids);
   if(error){toast("선택 삭제 실패: "+error.message);return;}
