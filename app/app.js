@@ -32,8 +32,7 @@ const pageInfo = {
   dinner:["회식·게임","회식방을 만들고 참여 직원과 메뉴 선택·게임을 진행합니다."],
   account:["내 정보·비밀번호","내 정보 확인과 비밀번호 변경"],
   employees:["직원관리","직원·부서·직급 정보를 관리합니다."],
-  permissions:["권한관리","직원별로 보이는 화면과 기능을 지정합니다."],
-  directorSchedule:["손동오 이사 일정","손동오 이사와 김헌정만 확인하고 관리하는 전용 일정입니다."]
+  permissions:["권한관리","직원별로 보이는 화면과 기능을 지정합니다."]
 };
 const menus = [
   ["dashboard","대시보드","dashboard_view"],
@@ -54,7 +53,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseSyncChannel:null, purchaseSyncTimer:null, purchaseRefreshTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false, directorSchedules:[], editingDirectorScheduleId:null, directorScheduleDate:new Date() };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -119,6 +118,59 @@ function appConfirm(message, options={}){
   });
 }
 window.appConfirm=appConfirm;
+
+// V117: Electron에서 지원하지 않는 prompt() 대신 앱 내부 입력창을 사용합니다.
+function appPrompt(message, options={}){
+  return new Promise(resolve=>{
+    document.getElementById("seorinPromptLayer")?.remove();
+    const layer=document.createElement("div");
+    layer.id="seorinPromptLayer";
+    layer.style.cssText="position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.38);display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:auto";
+    const dialog=document.createElement("div");
+    dialog.setAttribute("role","dialog");
+    dialog.setAttribute("aria-modal","true");
+    dialog.style.cssText="width:min(460px,calc(100vw - 40px));background:#fff;border-radius:14px;box-shadow:0 24px 80px rgba(15,23,42,.28);padding:22px;font-family:inherit";
+    const title=document.createElement("div");
+    title.textContent=options.title||"입력";
+    title.style.cssText="font-size:18px;font-weight:800;margin-bottom:10px;color:#0f172a";
+    const body=document.createElement("div");
+    body.textContent=String(message||"");
+    body.style.cssText="white-space:pre-wrap;line-height:1.55;color:#334155;margin-bottom:12px";
+    const input=options.multiline?document.createElement("textarea"):document.createElement("input");
+    if(!options.multiline) input.type=options.type||"text";
+    input.value=options.defaultValue??"";
+    if(options.placeholder) input.placeholder=options.placeholder;
+    input.style.cssText="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:9px;padding:11px 12px;font:inherit;outline:none;min-height:"+(options.multiline?"92px":"42px")+";resize:vertical";
+    const actions=document.createElement("div");
+    actions.style.cssText="display:flex;justify-content:flex-end;gap:8px;margin-top:16px";
+    const cancel=document.createElement("button");
+    cancel.type="button";cancel.textContent=options.cancelText||"취소";
+    cancel.style.cssText="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer";
+    const ok=document.createElement("button");
+    ok.type="button";ok.textContent=options.okText||"확인";
+    ok.style.cssText="border:0;background:#1677ff;color:#fff;border-radius:8px;padding:9px 16px;font-weight:800;cursor:pointer";
+    actions.append(cancel,ok);dialog.append(title,body,input,actions);layer.append(dialog);document.body.append(layer);
+    let done=false;
+    const finish=value=>{
+      if(done)return;done=true;
+      document.removeEventListener("keydown",onKey,true);
+      layer.remove();restorePortalInteraction();
+      requestAnimationFrame(restorePortalInteraction);setTimeout(restorePortalInteraction,30);
+      resolve(value);
+    };
+    const onKey=e=>{
+      if(e.key==="Escape"){e.preventDefault();finish(null);}
+      if(e.key==="Enter"&&!options.multiline&&!e.shiftKey){e.preventDefault();finish(input.value);}
+    };
+    document.addEventListener("keydown",onKey,true);
+    cancel.addEventListener("click",()=>finish(null));
+    ok.addEventListener("click",()=>finish(input.value));
+    layer.addEventListener("mousedown",e=>{if(e.target===layer)finish(null);});
+    setTimeout(()=>{input.focus();if(options.selectAll!==false)input.select?.();},0);
+  });
+}
+window.appPrompt=appPrompt;
+
 
 window.addEventListener("focus",()=>setTimeout(restorePortalInteraction,0));
 window.addEventListener("pageshow",restorePortalInteraction);
@@ -508,20 +560,15 @@ function showApp(){
   requestNoticeNotificationPermission();
   refreshAll();
 }
-function canUseDirectorSchedule(){
-  const name=String(state.profile?.name||"").trim();
-  return name==="손동오"||name==="김헌정";
-}
 function renderMenu(){
   const rows=menus.filter(m=>{
     if(m[0]==="purchase")return has("purchase_view")||has("inventory_view");
     return has(m[2]);
   });
-  const directorRow=canUseDirectorSchedule()?`<button class="nav-btn" data-page="directorSchedule" onclick="goPage('directorSchedule')"><span>손동오 이사 일정</span><span class="nav-unread hidden">0</span></button>`:"";
   $("menu").innerHTML=rows.map(([id,label])=>{
     const target=id==="purchase"&&!has("purchase_view")&&has("inventory_view")?"inventory":id;
     return `<button class="nav-btn" data-page="${id}" onclick="goPage('${target}')"><span>${label}</span><span class="nav-unread hidden" data-badge-for="${id}">0</span></button>`;
-  }).join("")+directorRow;
+  }).join("");
   updateMenuBadges();
 }
 function updateMenuBadges(){
@@ -533,9 +580,6 @@ function updateMenuBadges(){
   });
 }
 function goPage(id){
-  if(["community","private","dinner","notices","purchase","inventory","events","meetings","trips","vehicles","transport"].includes(id)){
-    window.seorinDesktop?.clearTaskbarAttention?.();
-  }
   if(id==="transport"){state.vehicleViewGroup="transport";id="vehicles";}
   if(id==="purchase"&&!has("purchase_view")&&has("inventory_view"))id="inventory";
   if(id==="inventory"&&!has("inventory_view")&&has("purchase_view"))id="purchase";
@@ -544,7 +588,6 @@ function goPage(id){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")||(["transport","vehicles","forklift"].includes(id)&&b.dataset.page==="transport")));
   $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
   if(id==="permissions") renderPermissions();
-  if(id==="directorSchedule"){ if(!canUseDirectorSchedule()){goPage("dashboard");return;} renderDirectorSchedules(); }
 }
 
 function openSignup(){$("signupForm").classList.remove("hidden");$("signupMsg").textContent="";}
@@ -664,8 +707,8 @@ async function loadProfile(){
 async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();location.reload()}
 
 async function refreshAll(){
-  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms(),loadDirectorSchedules()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseGlobalSync(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile(); renderDirectorSchedules();
+  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 async function loadCards(){
   if(!has("card_use"))return;
@@ -826,7 +869,6 @@ function notificationTargetPage(type,page){
   return map[String(type||"").toLowerCase()]||"dashboard";
 }
 async function openUnifiedNotification(payload={}){
-  window.seorinDesktop?.clearTaskbarAttention?.();
   const page=notificationTargetPage(payload.notification_type||payload.type,payload.target_page||payload.page);
   try{window.focus()}catch(_){ }
   goPage(page);
@@ -849,7 +891,6 @@ async function openUnifiedNotification(payload={}){
 }
 function showUnifiedWindowsNotification(row){
   if(!row)return;
-  window.seorinDesktop?.setTaskbarAttention?.(true);
   const payload={
     id:String(row.id||""),
     title:`서린컴퍼니 · ${row.title||"새 알림"}`,
@@ -936,47 +977,10 @@ function renderPendingWorkAlerts(showNative=false){
   const alerts=pendingWorkAlerts();const valid=new Set(alerts.map(a=>a.key));document.querySelectorAll("[data-work-alert-key]").forEach(el=>{if(!valid.has(el.dataset.workAlertKey))el.remove()});
   const ack=getAcknowledgedWorkKeys();alerts.filter(a=>!ack.has(a.key)).slice(0,8).reverse().forEach(a=>{const box=ensurePersistentWorkContainer();if(box.querySelector(`[data-work-alert-key="${CSS.escape(a.key)}"]`))return;const card=document.createElement("div");card.className="persistent-work-alert";card.dataset.workAlertKey=a.key;card.innerHTML=`<div class="persistent-notice-alert__head"><strong>${escapeHtml(a.kind)}</strong><span>처리 필요</span></div><div class="persistent-notice-alert__title">${escapeHtml(a.title)}</div><div class="persistent-notice-alert__content">${escapeHtml(a.content)}</div><button class="btn primary persistent-notice-alert__button">확인하러 가기</button>`;card.querySelector("button").onclick=()=>acknowledgeWorkAlert(a.key,a.page);box.prepend(card);if(showNative)showWindowsWorkNotification(a)})
 }
-let purchaseRefreshBusy=false;
-async function refreshPurchaseEverywhere(showAlert=false){
-  if(!state.user||!has("purchase_view")||purchaseRefreshBusy)return;
-  purchaseRefreshBusy=true;
-  try{
-    await loadPurchaseRequests();
-    renderPurchases();
-    renderDashboard();
-    renderPendingWorkAlerts(showAlert);
-  }finally{purchaseRefreshBusy=false;}
-}
-function queuePurchaseRefresh(showAlert=false,delay=120){
-  clearTimeout(state.purchaseRefreshTimer);
-  state.purchaseRefreshTimer=setTimeout(()=>refreshPurchaseEverywhere(showAlert),delay);
-}
-function setupPurchaseGlobalSync(){
-  if(state.purchaseSyncChannel){try{supabaseClient.removeChannel(state.purchaseSyncChannel)}catch(_){}}
-  state.purchaseSyncChannel=supabaseClient.channel(`purchase-global-sync-${state.user?.id||'guest'}-${Date.now()}`)
-    .on("postgres_changes",{event:"*",schema:"public",table:"purchase_requests"},()=>queuePurchaseRefresh(true,80))
-    .subscribe(status=>{
-      console.log("purchase realtime",status);
-      if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"||status==="CLOSED"){
-        setTimeout(()=>{if(state.user)setupPurchaseGlobalSync()},1200);
-      }
-      if(status==="SUBSCRIBED")queuePurchaseRefresh(false,20);
-    });
-  clearInterval(state.purchaseSyncTimer);
-  // Realtime이 일시적으로 끊겨도 최대 3초 안에 모든 기기가 같은 자료를 보도록 보조 동기화합니다.
-  state.purchaseSyncTimer=setInterval(()=>{
-    if(document.visibilityState==="visible")refreshPurchaseEverywhere(false);
-  },3000);
-  if(!window.__purchaseSyncFocusBound){
-    window.__purchaseSyncFocusBound=true;
-    window.addEventListener("focus",()=>queuePurchaseRefresh(false,20));
-    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")queuePurchaseRefresh(false,20)});
-  }
-}
 function setupWorkAlertRealtime(){
   if(state.workAlertChannel)return;
   state.workAlertChannel=supabaseClient.channel("seorin-work-alerts-v67")
-    .on("postgres_changes",{event:"*",schema:"public",table:"purchase_requests"},()=>queuePurchaseRefresh(true,80))
+    .on("postgres_changes",{event:"*",schema:"public",table:"purchase_requests"},async()=>{await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts(true)})
     .on("postgres_changes",{event:"*",schema:"public",table:"vehicle_maintenance"},async()=>{await loadVehicleMaintenance();renderVehicles();renderPendingWorkAlerts(true)})
     .on("postgres_changes",{event:"*",schema:"public",table:"forklift_maintenance"},async()=>{await loadForkliftMaintenance();renderForklifts();renderPendingWorkAlerts(true)})
     .subscribe();
@@ -1545,7 +1549,7 @@ function renderCalendar(){
             <span>${formatDays(x.days)}일</span>
           </div>`;
         }).join("")}
-        ${contractorDay.rows?.length?contractorDay.rows.map(c=>`<div class="calendar-event contractor-event" title="${escapeHtml(c.memo||"")}"><b>외주 · ${escapeHtml(c.company_name||"업체")}</b>${c.work_area?` · ${escapeHtml(c.work_area)}`:""}<span>출근 ${Number(c.headcount||0)}명 · 식사 ${Number(c.meal_count||0)}명</span></div>`).join(""):""}
+        ${has("calendar_manage")&&contractorDay.headcount?`<div class="calendar-event contractor-event"><b>외주 ${contractorDay.headcount}명</b> · 식사 ${contractorDay.meals}명</div>`:""}
         ${(state.companyEvents||[]).filter(e=>date>=e.start_date&&date<=e.end_date).map(e=>`<div class="calendar-event company-event"><b>${eventTypeLabel(e.event_type)}</b> · ${escapeHtml(e.title)}</div>`).join("")}
         ${(state.meetingBookings||[]).filter(m=>m.meeting_date===date).map(m=>`<div class="calendar-event meeting-event"><b>${String(m.start_time).slice(0,5)} 회의</b> · ${escapeHtml(m.title)}</div>`).join("")}
       </div>
@@ -1570,62 +1574,19 @@ function renderCalendar(){
     $("leaveSummaryTitle").textContent = `${employee?.name||"내"} 휴가 잔여 현황`;
   }
 
-  const historyRows=entries.slice().reverse();
-  $("calendarHistory").innerHTML=`<div class="table-wrap"><table><thead><tr>
-    ${["직원","시작일","종료일","구분","입력일수","환산/차감","메모","관리"].map(h=>`<th>${h}</th>`).join("")}
-  </tr></thead><tbody>${historyRows.length?historyRows.map(x=>{
-    const isMine=String(x.employee_id)===String(state.user?.id);
-    const canWithdraw=isMine||has("calendar_manage");
-    const action=canWithdraw
-      ? `<button type="button" class="danger small" onclick="withdrawCalendarEntry('${escapeHtml(x.id)}')">${isMine?"회수":"삭제"}</button>`
-      : "";
-    const converted=x.event_type==="weekend_work"
-      ? `${formatDays(Number(x.days)*1.5)}일 적립`
-      : `${formatDays(x.days)}일`;
-    return `<tr>
-      <td>${escapeHtml(x.profiles?.name||state.profile?.name||"")}</td>
-      <td>${escapeHtml(x.start_date||"")}</td>
-      <td>${escapeHtml(x.end_date||"")}</td>
-      <td>${escapeHtml(calendarLabels[x.event_type]||x.event_type||"")}</td>
-      <td>${escapeHtml(formatDays(x.days))}</td>
-      <td>${escapeHtml(converted)}</td>
-      <td class="left">${escapeHtml(x.memo||"")}</td>
-      <td>${action}</td>
-    </tr>`;
-  }).join(""):`<tr><td colspan="8">등록된 내역이 없습니다.</td></tr>`}</tbody></table></div>`;
+  $("calendarHistory").innerHTML=table(
+    ["직원","시작일","종료일","구분","입력일수","환산/차감","메모"],
+    entries.slice().reverse().map(x=>[
+      x.profiles?.name||state.profile?.name||"",
+      x.start_date,
+      x.end_date,
+      calendarLabels[x.event_type]||x.event_type,
+      formatDays(x.days),
+      x.event_type==="weekend_work"?formatDays(Number(x.days)*1.5)+"일 적립":formatDays(x.days)+"일",
+      x.memo
+    ])
+  );
 }
-
-window.withdrawCalendarEntry=async function(entryId){
-  const entry=state.calendarEntries.find(x=>String(x.id)===String(entryId));
-  if(!entry){toast("회수할 내역을 찾지 못했습니다.");return}
-
-  const isMine=String(entry.employee_id)===String(state.user?.id);
-  if(!isMine&&!has("calendar_manage")){
-    toast("본인이 등록한 일정만 회수할 수 있습니다.");
-    return;
-  }
-
-  const label=calendarLabels[entry.event_type]||"일정";
-  const message=isMine
-    ? `${entry.start_date} ${label} 내역을 회수할까요? 회수하면 달력과 사용내역에서 삭제되고 잔여 수량이 다시 반영됩니다.`
-    : `${entry.profiles?.name||"직원"}의 ${entry.start_date} ${label} 내역을 삭제할까요?`;
-  if(!(await appConfirm(message)))return;
-
-  let error=null;
-  const rpcResult=await supabaseClient.rpc("withdraw_work_calendar_entry",{p_entry_id:entryId});
-  if(rpcResult.error){
-    const fallback=await supabaseClient.from("work_calendar_entries").delete().eq("id",entryId);
-    error=fallback.error;
-  }
-  if(error){toast("회수 실패: "+error.message);return}
-
-  state.calendarEntries=state.calendarEntries.filter(x=>String(x.id)!==String(entryId));
-  await Promise.all([loadCalendarEntries(),loadLeaveAdjustments(),loadYearlyLeaveBalances()]);
-  renderCalendar();
-  renderDashboard();
-  toast(isMine?"내 일정을 회수했습니다.":"직원 일정을 삭제했습니다.");
-};
-
 async function saveCalendarEntry(){
   const type=$("calType").value;
   let days=Number($("calDays").value||1);
@@ -1857,31 +1818,10 @@ function renderContractors(){
       `${x.headcount||0}명`,
       `${x.meal_count||0}명`,
       x.memo||"",
-      `<div class="table-actions"><button class="btn small" onclick="editContractor('${x.id}')">수정</button><button class="btn small danger" onclick="deleteContractor('${x.id}')">회수</button></div>`
+      `<div class="table-actions"><button class="btn small" onclick="editContractor('${x.id}')">수정</button><button class="btn small danger" onclick="deleteContractor('${x.id}')">삭제</button></div>`
     ])
   );
   renderContractorSummary();
-}
-
-async function refreshContractorRelatedScreens(focusDate){
-  // 저장 직후 서버의 최신 값을 다시 읽어 사용자가 기다리거나 새로고침할 필요가 없게 한다.
-  await Promise.all([
-    loadContractorWorkforce(),
-    loadCalendarEntries(),
-    loadEmployees()
-  ]);
-
-  if(focusDate){
-    const parts=String(focusDate).split("-").map(Number);
-    if(parts.length>=2&&parts[0]&&parts[1]){
-      state.calendarDate=new Date(parts[0],parts[1]-1,1);
-    }
-    if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(focusDate).slice(0,7);
-  }
-
-  renderContractors();
-  renderCalendar();
-  renderDashboard();
 }
 
 async function saveContractor(){
@@ -1904,30 +1844,32 @@ async function saveContractor(){
   }
 
   const editingId=state.editingContractorId;
-  const saveBtn=$("saveContractorBtn");
-  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="저장 중...";}
-
-  try{
-    let result;
-    if(editingId){
-      result=await supabaseClient.from("contractor_workforce").update(row).eq("id",editingId).select().single();
-    }else{
-      result=await supabaseClient.from("contractor_workforce").insert(row).select().single();
-    }
-    if(result.error){toast("외주 인력 저장 실패: "+result.error.message);return}
-
-    // 저장 완료 후 DB를 즉시 재조회하여 목록·달력·대시보드의 시간차를 없앤다.
-    await refreshContractorRelatedScreens(row.work_date);
-    clearContractorForm();
-    // clearContractorForm이 날짜를 오늘로 바꾸므로 저장한 달의 목록과 달력은 다시 유지한다.
-    if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(row.work_date).slice(0,7);
-    renderContractors();
-    renderCalendar();
-    renderDashboard();
-    toast(editingId?"외주 인력 내역을 수정하고 화면을 자동 갱신했습니다.":"외주 인력을 등록하고 달력·인원 합계를 자동 갱신했습니다.");
-  }finally{
-    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent="외주 인력 저장";}
+  let result;
+  if(editingId){
+    result=await supabaseClient.from("contractor_workforce").update(row).eq("id",editingId).select().single();
+  }else{
+    result=await supabaseClient.from("contractor_workforce").insert(row).select().single();
   }
+  if(result.error){toast("외주 인력 저장 실패: "+result.error.message);return}
+
+  if(editingId){
+    const index=state.contractorWorkforce.findIndex(x=>String(x.id)===String(editingId));
+    if(index>=0) state.contractorWorkforce[index]=result.data;
+    else state.contractorWorkforce.unshift(result.data);
+  }else if(result.data){
+    state.contractorWorkforce.unshift(result.data);
+  }
+
+  clearContractorForm();
+  renderContractors();
+  toast(editingId?"외주 인력 내역을 수정했습니다.":"외주 인력을 등록했습니다.");
+
+  const refreshRelated=()=>{
+    try{ renderCalendar(); }catch(error){ console.warn("달력 지연 갱신 실패",error); }
+    try{ renderDashboard(); }catch(error){ console.warn("대시보드 지연 갱신 실패",error); }
+  };
+  if("requestIdleCallback" in window) requestIdleCallback(refreshRelated,{timeout:1500});
+  else setTimeout(refreshRelated,50);
 }
 
 window.editContractor=function(id){
@@ -1946,22 +1888,22 @@ window.editContractor=function(id){
 };
 
 window.deleteContractor=async function(id){
-  if(!(await appConfirm("이 외주 인력을 회수할까요? 회수하면 근무·휴무 달력과 출근·식사 합계가 등록 전 상태로 돌아갑니다.")))return;
-  const target=(state.contractorWorkforce||[]).find(x=>String(x.id)===String(id));
-  const targetDate=target?.work_date||selectedContractorDate();
+  if(!(await appConfirm("이 외주 인력 내역을 삭제할까요?")))return;
   const {error}=await supabaseClient.from("contractor_workforce").delete().eq("id",id);
-  if(error){toast("회수 실패: "+error.message);return}
+  if(error){toast("삭제 실패: "+error.message);return}
 
-  if(String(state.editingContractorId||"")===String(id)) state.editingContractorId=null;
-  // 회수 완료 후에도 서버 최신 값을 즉시 재조회해 달력과 합계를 바로 원상복구한다.
-  await refreshContractorRelatedScreens(targetDate);
-  clearContractorForm();
-  if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(targetDate).slice(0,7);
+  state.contractorWorkforce=(state.contractorWorkforce||[]).filter(x=>String(x.id)!==String(id));
+  if(String(state.editingContractorId||"")===String(id)) clearContractorForm();
   renderContractors();
-  renderCalendar();
-  renderDashboard();
   setTimeout(()=>$("contractorCompany")?.focus(),0);
-  toast("외주 인력을 회수하고 달력·출근·식사 합계를 즉시 원상복구했습니다.");
+  toast("외주 인력 내역을 삭제했습니다.");
+
+  const refreshRelated=()=>{
+    try{ renderCalendar(); }catch(error){ console.warn("달력 지연 갱신 실패",error); }
+    try{ renderDashboard(); }catch(error){ console.warn("대시보드 지연 갱신 실패",error); }
+  };
+  if("requestIdleCallback" in window) requestIdleCallback(refreshRelated,{timeout:1500});
+  else setTimeout(refreshRelated,50);
 };
 
 function getDashboardPurchaseItems(){
@@ -2169,16 +2111,12 @@ async function savePurchase(){
     requester_name:state.profile?.name||""
   };
   if(!row.item_name||row.quantity<=0||!row.purpose){toast("품목명, 수량, 사용 목적을 입력하세요.");return}
-  const {data:created,error}=await supabaseClient.from("purchase_requests").insert(row).select("*").single();
+  const {error}=await supabaseClient.from("purchase_requests").insert(row);
   if(error){toast("구매 신청 실패: "+error.message);return}
-  if(created){
-    state.purchaseRequests=[created,...(state.purchaseRequests||[]).filter(x=>String(x.id)!==String(created.id))];
-    renderPurchases();renderDashboard();
-  }
   ["purchaseItemName","purchaseUnit","purchasePurpose","purchaseMemo","purchaseEstimatedAmount"].forEach(id=>$(id).value="");
   $("purchaseQuantity").value="1";$("purchaseUrgent").value="false";$("purchaseNeededDate").value="";
   toast("구매 신청이 등록되었습니다.");
-  await refreshPurchaseEverywhere(false);
+  await loadPurchaseRequests();renderPurchases();renderDashboard();
 }
 function usageDayCount(x){
   if(!x.completed_at)return null;
@@ -2232,10 +2170,9 @@ window.deletePurchaseRequest=async function(id){
   if(!isRecordAdmin()){toast("관리자만 구매 신청을 삭제할 수 있습니다.");return}
   const row=(state.purchaseRequests||[]).find(x=>String(x.id)===String(id));
   if(!(await appConfirm(`${row?.item_name||"이 구매 신청"}을 삭제할까요?`)))return;
-  const {error}=await supabaseClient.rpc("admin_delete_purchase_request",{p_request_id:id});
-  if(error){toast("구매 신청 삭제 실패: "+error.message);await refreshPurchaseEverywhere(false);return}
-  await refreshPurchaseEverywhere(false);
-  toast("구매 신청을 서버에서 삭제했습니다.");
+  const {error}=await supabaseClient.from("purchase_requests").delete().eq("id",id);
+  if(error){toast("구매 신청 삭제 실패: "+error.message);return}
+  fastRemoveFromState("purchaseRequests",id,()=>{renderPurchases();renderDashboard();});toast("구매 신청을 삭제했습니다.");
 }
 async function finalCompletePurchase(id){
   if(!isFinalPurchaseApprover()){toast("최종관리자만 완료 처리할 수 있습니다.");return}
@@ -2248,7 +2185,7 @@ async function finalCompletePurchase(id){
     p_reason:"최고관리자 직접 완료 처리"
   });
   if(error){toast(`완료 처리 실패: ${error.message}`);return}
-  await refreshPurchaseEverywhere(false);
+  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
   toast("최고관리자가 검토 단계를 생략하고 구매완료 처리했습니다.");
 }
 
@@ -2297,10 +2234,10 @@ window.changePurchaseStatus=async function(id,status){
   const {error}=await call;
   if(error){toast("상태 변경 실패: "+error.message);return}
   toast((direct?"검토 생략 · ":"")+label+" 처리되었습니다.");
-  await refreshPurchaseEverywhere(false);
+  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
 };
 window.rejectPurchase=async function(id){
-  const reason=prompt("반려 사유를 입력하세요.");
+  const reason=await appPrompt("반려 사유를 입력하세요.",{title:"구매 반려",multiline:true,placeholder:"반려 사유"});
   if(reason===null)return;
   if(!reason.trim()){toast("반려 사유를 입력하세요.");return}
   const direct=isFinalPurchaseApprover();
@@ -2308,16 +2245,16 @@ window.rejectPurchase=async function(id){
     ? await supabaseClient.rpc("admin_direct_purchase_status",{p_request_id:id,p_status:"rejected",p_reason:reason.trim()})
     : await supabaseClient.rpc("update_purchase_request_status",{p_request_id:id,p_status:"rejected",p_reason:reason.trim()});
   if(error){toast("반려 처리 실패: "+error.message);return}
-  toast("반려 처리되었습니다.");await refreshPurchaseEverywhere(false);
+  toast("반려 처리되었습니다.");await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
 };
 window.completePurchaseUsage=async function(id){
   const target=(state.purchaseRequests||[]).find(x=>String(x.id)===String(id));
   if(!target){toast("구매 기록을 찾을 수 없습니다.");return}
   const today=new Date().toISOString().slice(0,10);
-  const usageDate=prompt(`'${target.item_name||"구매 물품"}' 사용완료일을 입력하세요.\n형식: YYYY-MM-DD`,today);
+  const usageDate=await appPrompt(`'${target.item_name||"구매 물품"}' 사용완료일을 입력하세요.\n형식: YYYY-MM-DD`,{title:"사용완료일",defaultValue:today,placeholder:"YYYY-MM-DD"});
   if(usageDate===null)return;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(usageDate.trim())){toast("사용완료일을 YYYY-MM-DD 형식으로 입력하세요.");return}
-  const note=prompt("사용 관련 비고가 있으면 입력하세요. (선택)","");
+  const note=await appPrompt("사용 관련 비고가 있으면 입력하세요. (선택)",{title:"사용 비고",multiline:true,defaultValue:""});
   if(note===null)return;
   if(!(await appConfirm(`사용완료일 ${usageDate.trim()}로 기록할까요?`)))return;
   const {error}=await supabaseClient.rpc("complete_purchase_usage",{
@@ -2327,7 +2264,7 @@ window.completePurchaseUsage=async function(id){
   });
   if(error){toast("사용완료 처리 실패: "+error.message);return}
   toast("사용완료 처리되었습니다. 사용기간이 자동 계산됩니다.");
-  await refreshPurchaseEverywhere(false);
+  await loadPurchaseRequests();renderPurchases();renderDashboard();
 };
 function exportXlsx(data,filename,sheet){
   if(!window.XLSX){toast("엑셀 모듈을 불러오지 못했습니다.");return}
@@ -2741,8 +2678,8 @@ async function addOrgTeam(){
 
 window.editOrgTeam=async function(id){
   const t=state.orgTeams.find(x=>x.id===id);if(!t)return;
-  const name=prompt("팀명을 입력하세요.",t.name);if(name===null)return;
-  const orderText=prompt("표시순서를 입력하세요.",String(t.sort_order??99));if(orderText===null)return;
+  const name=await appPrompt("팀명을 입력하세요.",{title:"팀명 수정",defaultValue:t.name});if(name===null)return;
+  const orderText=await appPrompt("표시순서를 입력하세요.",{title:"표시순서 수정",defaultValue:String(t.sort_order??99),type:"number"});if(orderText===null)return;
 
   const {error}=await supabaseClient.rpc("manage_organization_team",{
     p_action:"update",
@@ -3521,70 +3458,7 @@ async function exportAllCompanyData(){
   toast(`전체 자료 엑셀 백업을 만들었습니다.${failures.length?` (${failures.length}개 항목은 권한/테이블 문제로 제외)`:""}`);
 }
 
-
-async function loadDirectorSchedules(){
-  if(!canUseDirectorSchedule())return;
-  const {data,error}=await supabaseClient.from("director_schedules").select("*").order("schedule_date",{ascending:true}).order("start_time",{ascending:true});
-  if(error){console.error("director_schedules load error",error);state.directorSchedules=[];return;}
-  state.directorSchedules=data||[];
-}
-function directorScheduleMonthKey(v){const d=new Date(v);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;}
-function renderDirectorSchedules(){
-  if(!canUseDirectorSchedule()||!$("directorScheduleCalendar"))return;
-  if(!$("directorScheduleDate").value)clearDirectorSchedule();
-  const base=state.directorScheduleDate||new Date();
-  const y=base.getFullYear(),m=base.getMonth();
-  $("directorScheduleMonthLabel").textContent=`${y}년 ${m+1}월`;
-  const first=new Date(y,m,1),last=new Date(y,m+1,0),start=first.getDay();
-  const monthRows=(state.directorSchedules||[]).filter(x=>{const d=new Date(`${x.schedule_date}T00:00:00`);return d.getFullYear()===y&&d.getMonth()===m;});
-  const byDay=new Map();monthRows.forEach(x=>{const k=Number(String(x.schedule_date).slice(8,10));if(!byDay.has(k))byDay.set(k,[]);byDay.get(k).push(x);});
-  let html=['일','월','화','수','목','금','토'].map(x=>`<div class="director-weekday">${x}</div>`).join('');
-  for(let i=0;i<start;i++)html+='<div class="director-day empty-day"></div>';
-  for(let day=1;day<=last.getDate();day++){
-    const rows=byDay.get(day)||[];
-    html+=`<div class="director-day"><b class="director-day-number">${day}</b>${rows.map(x=>`<button type="button" class="director-event ${x.importance==='중요'?'important':''} ${x.is_completed?'completed':''}" onclick="editDirectorSchedule('${x.id}')"><span>${escapeHtml((x.start_time||'').slice(0,5))}</span>${escapeHtml(x.title||'일정')}</button>`).join('')}</div>`;
-  }
-  $("directorScheduleCalendar").innerHTML=html;
-  const today=new Date().toISOString().slice(0,10);
-  const upcoming=(state.directorSchedules||[]).filter(x=>x.schedule_date>=today).sort((a,b)=>`${a.schedule_date} ${a.start_time||''}`.localeCompare(`${b.schedule_date} ${b.start_time||''}`)).slice(0,30);
-  $("directorScheduleList").innerHTML=upcoming.length?upcoming.map(x=>`<div class="director-list-row"><div><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.schedule_date)} ${escapeHtml((x.start_time||'').slice(0,5))}${x.end_time?`~${escapeHtml(String(x.end_time).slice(0,5))}`:''}${x.location?` · ${escapeHtml(x.location)}`:''}</small><p>${escapeHtml(x.memo||'')}</p></div><div class="actions"><button class="btn small" onclick="editDirectorSchedule('${x.id}')">수정</button><button class="btn small danger" onclick="deleteDirectorSchedule('${x.id}')">삭제</button></div></div>`).join(''):'<div class="empty">등록된 예정 일정이 없습니다.</div>';
-}
-function clearDirectorSchedule(){
-  state.editingDirectorScheduleId=null;
-  ["directorScheduleTitle","directorScheduleLocation","directorScheduleMemo"].forEach(id=>{if($(id))$(id).value='';});
-  if($("directorScheduleDate"))$("directorScheduleDate").value=new Date().toISOString().slice(0,10);
-  if($("directorScheduleStart"))$("directorScheduleStart").value='09:00';
-  if($("directorScheduleEnd"))$("directorScheduleEnd").value='';
-  if($("directorScheduleImportance"))$("directorScheduleImportance").value='일반';
-  if($("directorScheduleCompleted"))$("directorScheduleCompleted").checked=false;
-  if($("saveDirectorScheduleBtn"))$("saveDirectorScheduleBtn").textContent='일정 저장';
-}
-async function saveDirectorSchedule(){
-  if(!canUseDirectorSchedule())return;
-  const row={schedule_date:$("directorScheduleDate").value,start_time:$("directorScheduleStart").value||null,end_time:$("directorScheduleEnd").value||null,title:$("directorScheduleTitle").value.trim(),location:$("directorScheduleLocation").value.trim(),memo:$("directorScheduleMemo").value.trim(),importance:$("directorScheduleImportance").value,is_completed:$("directorScheduleCompleted").checked,updated_by:state.user.id,updated_by_name:state.profile?.name||''};
-  if(!row.schedule_date||!row.title){toast('날짜와 일정 제목을 입력하세요.');return;}
-  const btn=$("saveDirectorScheduleBtn");btn.disabled=true;btn.textContent='저장 중…';
-  let error;
-  if(state.editingDirectorScheduleId)({error}=await supabaseClient.from('director_schedules').update(row).eq('id',state.editingDirectorScheduleId));
-  else ({error}=await supabaseClient.from('director_schedules').insert({...row,created_by:state.user.id,created_by_name:state.profile?.name||''}));
-  btn.disabled=false;
-  if(error){btn.textContent='일정 저장';toast('일정 저장 실패: '+error.message);return;}
-  state.directorScheduleDate=new Date(`${row.schedule_date}T00:00:00`);
-  await loadDirectorSchedules();clearDirectorSchedule();renderDirectorSchedules();toast('일정이 즉시 반영되었습니다.');
-}
-window.editDirectorSchedule=id=>{
-  const x=(state.directorSchedules||[]).find(r=>String(r.id)===String(id));if(!x)return;
-  state.editingDirectorScheduleId=x.id;$("directorScheduleDate").value=x.schedule_date||'';$("directorScheduleStart").value=String(x.start_time||'').slice(0,5);$("directorScheduleEnd").value=String(x.end_time||'').slice(0,5);$("directorScheduleTitle").value=x.title||'';$("directorScheduleLocation").value=x.location||'';$("directorScheduleMemo").value=x.memo||'';$("directorScheduleImportance").value=x.importance||'일반';$("directorScheduleCompleted").checked=Boolean(x.is_completed);$("saveDirectorScheduleBtn").textContent='일정 수정 저장';window.scrollTo({top:0,behavior:'smooth'});
-};
-window.deleteDirectorSchedule=async id=>{if(!(await appConfirm('이 일정을 삭제할까요?')))return;const {error}=await supabaseClient.from('director_schedules').delete().eq('id',id);if(error){toast('삭제 실패: '+error.message);return;}await loadDirectorSchedules();clearDirectorSchedule();renderDirectorSchedules();toast('일정이 즉시 삭제되었습니다.');};
-function moveDirectorScheduleMonth(delta){state.directorScheduleDate=new Date(state.directorScheduleDate.getFullYear(),state.directorScheduleDate.getMonth()+delta,1);renderDirectorSchedules();}
-
 $("loginBtn").onclick=login;$("logoutBtn").onclick=logout;
-if($("saveDirectorScheduleBtn"))$("saveDirectorScheduleBtn").onclick=saveDirectorSchedule;
-if($("clearDirectorScheduleBtn"))$("clearDirectorScheduleBtn").onclick=clearDirectorSchedule;
-if($("directorSchedulePrevBtn"))$("directorSchedulePrevBtn").onclick=()=>moveDirectorScheduleMonth(-1);
-if($("directorScheduleNextBtn"))$("directorScheduleNextBtn").onclick=()=>moveDirectorScheduleMonth(1);
-if($("directorScheduleTodayBtn"))$("directorScheduleTodayBtn").onclick=()=>{state.directorScheduleDate=new Date();renderDirectorSchedules();};
 $("openSignupBtn").onclick=openSignup;$("closeSignupBtn").onclick=closeSignup;$("signupBtn").onclick=signup;
 $("newNoticeBtn").onclick=()=>toggle("noticeForm");$("saveNoticeBtn").onclick=saveNotice;
 $("saveCardBtn").onclick=saveCard;$("exportCardBtn").onclick=exportCards;$("cardMonthFilter").onchange=renderCards;$("cardSearch").oninput=renderCards;
@@ -3922,7 +3796,7 @@ window.editVehicleMaintenance=id=>{const x=state.vehicleMaintenance.find(r=>Stri
 window.deleteVehicleMaintenance=async id=>{if(!(await appConfirm("이 정비 내역을 삭제할까요?")))return;const {error}=await supabaseClient.from("vehicle_maintenance").delete().eq("id",id);if(error){toast("삭제 실패: "+error.message);return}fastRemoveFromState("vehicleMaintenance",id,renderVehicles);toast("정비 내역을 삭제했습니다.")}
 function vehicleWorkflowLabel(v){return ({reported:"금액확인 대기",amount_checked:"최종결재 대기",approved:"결재완료",rejected:"반려"})[v]||v||"보고"}
 function vehicleMaintenanceActions(x){const a=[];if(currentUserIs("김헌정")&&(x.workflow_status||"reported")==="reported")a.push(`<button class="btn small primary" onclick="checkMaintenanceAmount('vehicle','${x.id}')">금액 확인</button>`);if((currentUserIs("손동오")||state.profile?.is_super_admin)&&x.workflow_status==="amount_checked"){a.push(`<button class="btn small primary" onclick="approveMaintenance('vehicle','${x.id}',true)">결재</button>`);a.push(`<button class="btn small danger" onclick="approveMaintenance('vehicle','${x.id}',false)">반려</button>`)}if(x.reported_by===state.user.id||isRecordAdmin())a.push(`<button class="btn small" onclick="editVehicleMaintenance('${x.id}')">수정</button>`);if(isRecordAdmin())a.push(`<button class="btn small danger" onclick="deleteVehicleMaintenance('${x.id}')">삭제</button>`);return a.join(" ")||"-"}
-async function checkMaintenanceAmount(kind,id){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";const list=kind==="forklift"?state.forkliftMaintenance:state.vehicleMaintenance;const x=list.find(r=>String(r.id)===String(id));const amount=prompt("확인할 금액을 입력하세요.",String(x?.cost||0));if(amount===null)return;const value=Number(String(amount).replace(/,/g,""));if(!Number.isFinite(value)||value<0){toast("금액을 확인하세요.");return}const {error}=await supabaseClient.from(table).update({cost:value,workflow_status:"amount_checked",amount_checked_by:state.user.id,amount_checked_by_name:state.profile?.name||"김헌정",amount_checked_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("금액 확인 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts(true);toast("금액 확인을 완료했습니다. 손동오 관리자에게 최종 결재 알림이 전달됩니다.")}
+async function checkMaintenanceAmount(kind,id){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";const list=kind==="forklift"?state.forkliftMaintenance:state.vehicleMaintenance;const x=list.find(r=>String(r.id)===String(id));const amount=await appPrompt("확인할 금액을 입력하세요.",{title:"정비 금액 확인",defaultValue:String(x?.cost||0),type:"number"});if(amount===null)return;const value=Number(String(amount).replace(/,/g,""));if(!Number.isFinite(value)||value<0){toast("금액을 확인하세요.");return}const {error}=await supabaseClient.from(table).update({cost:value,workflow_status:"amount_checked",amount_checked_by:state.user.id,amount_checked_by_name:state.profile?.name||"김헌정",amount_checked_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("금액 확인 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts(true);toast("금액 확인을 완료했습니다. 손동오 관리자에게 최종 결재 알림이 전달됩니다.")}
 window.checkMaintenanceAmount=checkMaintenanceAmount;
 async function approveMaintenance(kind,id,approved){const table=kind==="forklift"?"forklift_maintenance":"vehicle_maintenance";if(!(await appConfirm(approved?"최종 결재하시겠습니까?":"반려하시겠습니까?")))return;const {error}=await supabaseClient.from(table).update({workflow_status:approved?"approved":"rejected",approved_by:state.user.id,approved_by_name:state.profile?.name||"손동오",approved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("처리 실패: "+error.message);return}await (kind==="forklift"?loadForkliftMaintenance():loadVehicleMaintenance());kind==="forklift"?renderForklifts():renderVehicles();renderPendingWorkAlerts();toast(approved?"최종 결재했습니다.":"반려했습니다.")}
 window.approveMaintenance=approveMaintenance;
