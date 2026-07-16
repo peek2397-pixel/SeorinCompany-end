@@ -539,39 +539,27 @@
         </div>
       </section>
 
-      <section id="scheduleAdminPage" class="page">
+      <section id="directorSchedulePage" class="page">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>스케줄 관리</h3>
-              <small>김헌정·손동오 전용 · 전체 직원의 연차·반차·반반차·휴무·주말근무 일정을 조회하고 회수합니다.</small>
+              <h3>이사 스케줄</h3>
+              <small>김헌정·손동오 전용 · 달력 날짜를 클릭해 손동오 이사 일정을 등록합니다.</small>
             </div>
-            <button id="refreshScheduleAdminBtn" class="btn">새로고침</button>
+            <div class="inline-actions">
+              <button id="directorSchedulePrevBtn" class="btn">이전 달</button>
+              <button id="directorScheduleTodayBtn" class="btn">오늘</button>
+              <button id="directorScheduleNextBtn" class="btn">다음 달</button>
+              <button id="refreshDirectorScheduleBtn" class="btn">새로고침</button>
+            </div>
           </div>
-          <div class="form-grid schedule-admin-filter">
-            <label>직원
-              <select id="scheduleAdminEmployeeFilter"></select>
-            </label>
-            <label>월
-              <input id="scheduleAdminMonthFilter" type="month" />
-            </label>
-            <label>구분
-              <select id="scheduleAdminTypeFilter">
-                <option value="all">전체</option>
-                <option value="annual">연차</option>
-                <option value="half">반차</option>
-                <option value="quarter">반반차</option>
-                <option value="off">휴무</option>
-                <option value="weekend_work">주말근무</option>
-                <option value="comp_used">대체휴일 사용</option>
-                <option value="domestic_trip">국내출장</option>
-                <option value="overseas_trip">해외출장</option>
-                <option value="other">기타</option>
-              </select>
-            </label>
+          <h2 id="directorScheduleTitle" class="calendar-title"></h2>
+          <div class="privacy-note">날짜 칸을 클릭하면 일정 제목·시간·장소·메모 입력창이 열립니다. 등록된 일정을 클릭하면 수정 또는 삭제할 수 있습니다.</div>
+          <div id="directorScheduleCalendar"></div>
+          <div class="panel-head compact-head">
+            <div><h3>이사 일정 목록</h3><small>선택한 달의 일정입니다.</small></div>
           </div>
-          <div class="privacy-note">회수하면 해당 일정이 달력에서 즉시 삭제되고 연차·대휴 잔여 수량도 자동으로 다시 계산됩니다.</div>
-          <div id="scheduleAdminTable"></div>
+          <div id="directorScheduleList"></div>
         </div>
       </section>
 

@@ -1,0 +1,132 @@
+BEGIN;
+
+-- ==========================================================
+-- V123 이사 스케줄
+-- 근무·휴무 달력과 별도 운영
+-- 김헌정·손동오만 조회·등록·수정·삭제 가능
+-- ==========================================================
+
+CREATE TABLE IF NOT EXISTS public.director_schedules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_date date NOT NULL,
+  title text NOT NULL,
+  start_time time,
+  end_time time,
+  location text,
+  memo text,
+  created_by uuid,
+  created_by_name text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.director_schedules ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+ON TABLE public.director_schedules
+TO authenticated;
+
+DROP POLICY IF EXISTS "director_schedules_select_admin"
+ON public.director_schedules;
+
+DROP POLICY IF EXISTS "director_schedules_insert_admin"
+ON public.director_schedules;
+
+DROP POLICY IF EXISTS "director_schedules_update_admin"
+ON public.director_schedules;
+
+DROP POLICY IF EXISTS "director_schedules_delete_admin"
+ON public.director_schedules;
+
+CREATE POLICY "director_schedules_select_admin"
+ON public.director_schedules
+FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id::text = auth.uid()::text
+      AND TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  )
+);
+
+CREATE POLICY "director_schedules_insert_admin"
+ON public.director_schedules
+FOR INSERT TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id::text = auth.uid()::text
+      AND TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  )
+);
+
+CREATE POLICY "director_schedules_update_admin"
+ON public.director_schedules
+FOR UPDATE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id::text = auth.uid()::text
+      AND TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id::text = auth.uid()::text
+      AND TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  )
+);
+
+CREATE POLICY "director_schedules_delete_admin"
+ON public.director_schedules
+FOR DELETE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id::text = auth.uid()::text
+      AND TRIM(COALESCE(p.name,'')) IN ('김헌정','손동오')
+  )
+);
+
+CREATE OR REPLACE FUNCTION public.set_director_schedule_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_director_schedule_updated_at
+ON public.director_schedules;
+
+CREATE TRIGGER trg_director_schedule_updated_at
+BEFORE UPDATE ON public.director_schedules
+FOR EACH ROW
+EXECUTE FUNCTION public.set_director_schedule_updated_at();
+
+ALTER TABLE public.director_schedules REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime
+    ADD TABLE public.director_schedules;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_director_schedules_date
+ON public.director_schedules(schedule_date, start_time);
+
+NOTIFY pgrst, 'reload schema';
+
+COMMIT;

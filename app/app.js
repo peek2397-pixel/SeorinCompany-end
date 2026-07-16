@@ -22,7 +22,7 @@ const pageInfo = {
   inventory:["물품관리","요소수 등 물류 소모품 재고관리"],
   purchase:["구매관리","구매요청과 승인 상태 관리"],
   calendar:["근무·휴무 달력","연차, 반차, 반반차, 주말근무와 대체휴일을 관리합니다."],
-  scheduleAdmin:["스케줄 관리","김헌정·손동오 전용으로 전체 직원 일정을 조회·회수합니다."],
+  directorSchedule:["이사 스케줄","김헌정·손동오 전용으로 손동오 이사 일정을 관리합니다."],
   contractors:["외주 업체 인력관리","날짜별 외주 출근·식사 인원과 점심 주문 수량을 관리합니다."],
   events:["회사 일정·B2C 행사","전 직원이 함께 확인하는 행사와 회사 일정을 관리합니다."],
   meetings:["회의실 예약","회의실 일정과 미팅 정보를 예약하고 확인합니다."],
@@ -44,7 +44,7 @@ const menus = [
   ["corporateCard","법인카드","card_use"],
   ["purchase","구매·물품관리","purchase_view"],
   ["calendar","근무·휴무 달력","calendar_use"],
-  ["scheduleAdmin","스케줄 관리","__schedule_admin__"],
+  ["directorSchedule","이사 스케줄","__director_schedule__"],
   ["events","회사 일정·B2C 행사","events_view"],
   ["meetings","회의실 예약","meetings_view"],
   ["contractors","외주 업체 인력관리","contractors_view"],
@@ -55,7 +55,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, inventoryHistoryItemIds:new Set(), sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], directorSchedules:[], directorScheduleDate:new Date(), leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, inventoryHistoryItemIds:new Set(), sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -565,7 +565,7 @@ function showApp(){
 function renderMenu(){
   const rows=menus.filter(m=>{
     if(m[0]==="purchase")return has("purchase_view")||has("inventory_view");
-    if(m[0]==="scheduleAdmin")return isScheduleAdmin();
+    if(m[0]==="directorSchedule")return isScheduleAdmin();
     return has(m[2]);
   });
   $("menu").innerHTML=rows.map(([id,label])=>{
@@ -583,8 +583,8 @@ function updateMenuBadges(){
   });
 }
 function goPage(id){
-  if(id==="scheduleAdmin"&&!isScheduleAdmin()){
-    toast("스케줄 관리는 김헌정·손동오만 사용할 수 있습니다.");
+  if(id==="directorSchedule"&&!isScheduleAdmin()){
+    toast("이사 스케줄은 김헌정·손동오만 사용할 수 있습니다.");
     id="calendar";
   }
   if(id==="transport"){state.vehicleViewGroup="transport";id="vehicles";}
@@ -595,7 +595,7 @@ function goPage(id){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===id||((id==="inventory"||id==="purchase")&&b.dataset.page==="purchase")||(["transport","vehicles","forklift"].includes(id)&&b.dataset.page==="transport")));
   $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
   if(id==="permissions") renderPermissions();
-  if(id==="scheduleAdmin") renderScheduleAdmin();
+  if(id==="directorSchedule") renderDirectorSchedule();
 }
 
 function openSignup(){$("signupForm").classList.remove("hidden");$("signupMsg").textContent="";}
@@ -715,7 +715,7 @@ async function loadProfile(){
 async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();location.reload()}
 
 async function refreshAll(){
-  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
+  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadDirectorSchedules(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
   renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupSharedOperationalRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 
@@ -731,6 +731,7 @@ async function refreshSharedOperationalData(){
   try{
     await Promise.all([
       loadCalendarEntries(),
+      loadDirectorSchedules(),
       loadContractorWorkforce(),
       loadCompanyEvents(),
       loadMeetingBookings(),
@@ -777,6 +778,7 @@ function setupSharedOperationalRealtime(){
   const handlers=[
     ["contractor_workforce",async()=>{await loadContractorWorkforce();renderContractors();renderCalendar();renderDashboard();}],
     ["work_calendar_entries",async()=>{await loadCalendarEntries();renderCalendar();renderDashboard();renderContractorSummary();}],
+    ["director_schedules",async()=>{await loadDirectorSchedules();renderDirectorSchedule();}],
     ["company_events",async()=>{await loadCompanyEvents();renderCompanyEvents();renderCalendar();renderDashboard();}],
     ["meeting_bookings",async()=>{await loadMeetingBookings();renderMeetings();renderCalendar();renderDashboard();}],
     ["business_trips",async()=>{await loadBusinessTrips();renderBusinessTrips();renderCalendar();renderDashboard();}],
@@ -1792,7 +1794,7 @@ function renderCalendar(){
     $("leaveSummaryTitle").textContent = `${employee?.name||"내"} 휴가 잔여 현황`;
   }
 
-  $("calendarHistory").innerHTML=table(
+  $("calendarHistory").innerHTML=tableHtml(
     ["직원","시작일","종료일","구분","입력일수","환산/차감","메모","관리"],
     entries.slice().reverse().map(x=>{
       const own=String(x.employee_id)===String(state.user.id);
@@ -1811,52 +1813,155 @@ function renderCalendar(){
   );
 }
 
-function renderScheduleAdmin(){
-  if(!$("scheduleAdminTable"))return;
+
+async function loadDirectorSchedules(){
+  if(!isScheduleAdmin()) {
+    state.directorSchedules=[];
+    return;
+  }
+  const {data,error}=await supabaseClient
+    .from("director_schedules")
+    .select("*")
+    .order("schedule_date",{ascending:true})
+    .order("start_time",{ascending:true});
+  if(error){
+    console.warn("이사 스케줄 조회 실패",error);
+    return;
+  }
+  state.directorSchedules=data||[];
+}
+
+function renderDirectorSchedule(){
+  const box=$("directorScheduleCalendar");
+  if(!box)return;
   if(!isScheduleAdmin()){
-    $("scheduleAdminTable").innerHTML=`<div class="empty">김헌정·손동오만 사용할 수 있습니다.</div>`;
+    box.innerHTML=`<div class="empty">김헌정·손동오만 사용할 수 있습니다.</div>`;
     return;
   }
 
-  const empSel=$("scheduleAdminEmployeeFilter");
-  const monthInput=$("scheduleAdminMonthFilter");
-  const typeSel=$("scheduleAdminTypeFilter");
+  const d=state.directorScheduleDate||new Date();
+  const first=new Date(d.getFullYear(),d.getMonth(),1);
+  const last=new Date(d.getFullYear(),d.getMonth()+1,0);
+  const month=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  $("directorScheduleTitle").textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 이사 스케줄`;
 
-  if(empSel && !empSel.dataset.ready){
-    empSel.innerHTML=`<option value="all">전체 직원</option>`+
-      (state.employees||[]).map(e=>`<option value="${e.id}">${escapeHtml(e.name)} · ${escapeHtml(e.team||"")}</option>`).join("");
-    empSel.value="all";
-    empSel.dataset.ready="1";
+  let html=`<div class="calendar-week">${["일","월","화","수","목","금","토"].map((w,i)=>`<div class="${i===0?"sun":i===6?"sat":""}">${w}</div>`).join("")}</div><div class="calendar-grid director-calendar-grid">`;
+  for(let i=0;i<first.getDay();i++)html+=`<div class="calendar-cell muted"></div>`;
+
+  for(let day=1;day<=last.getDate();day++){
+    const date=`${month}-${String(day).padStart(2,"0")}`;
+    const schedules=(state.directorSchedules||[]).filter(x=>x.schedule_date===date);
+    html+=`<div class="calendar-cell director-date-cell" onclick="openDirectorScheduleCreate('${date}')">
+      <div class="calendar-day">${day}</div>
+      <div class="calendar-events">
+        ${schedules.map(x=>`<button type="button" class="calendar-event director-schedule-event" onclick="event.stopPropagation();openDirectorScheduleEdit('${x.id}')">
+          <b>${escapeHtml(String(x.start_time||"").slice(0,5)||"종일")}</b> · ${escapeHtml(x.title||"일정")}
+          ${x.location?`<span>${escapeHtml(x.location)}</span>`:""}
+        </button>`).join("")}
+      </div>
+    </div>`;
   }
+  box.innerHTML=html+`</div>`;
 
-  if(monthInput && !monthInput.value)monthInput.value=monthKey(state.calendarDate||new Date());
-
-  const employeeId=empSel?.value||"all";
-  const month=monthInput?.value||"";
-  const type=typeSel?.value||"all";
-
-  let rows=(state.calendarEntries||[]).slice();
-  if(employeeId!=="all")rows=rows.filter(x=>String(x.employee_id)===String(employeeId));
-  if(month)rows=rows.filter(x=>String(x.start_date||"").slice(0,7)===month || String(x.end_date||"").slice(0,7)===month);
-  if(type!=="all")rows=rows.filter(x=>String(x.event_type)===type);
-  rows.sort((a,b)=>String(b.start_date||"").localeCompare(String(a.start_date||"")));
-
-  $("scheduleAdminTable").innerHTML=table(
-    ["직원","시작일","종료일","구분","일수","등록자","메모","관리"],
-    rows.map(x=>[
-      x.profiles?.name||"직원",
-      x.start_date,
-      x.end_date,
-      calendarLabels[x.event_type]||x.event_type,
-      formatDays(x.days)+"일",
-      x.created_by_name||"-",
+  const rows=(state.directorSchedules||[])
+    .filter(x=>String(x.schedule_date||"").slice(0,7)===month)
+    .map(x=>[
+      x.schedule_date,
+      `${String(x.start_time||"").slice(0,5)||"종일"}${x.end_time?` ~ ${String(x.end_time).slice(0,5)}`:""}`,
+      x.title||"",
+      x.location||"",
       x.memo||"",
-      `<button class="btn small danger" onclick="recallCalendarEntry('${x.id}',true)">회수</button>`
-    ])
-  );
+      x.created_by_name||"",
+      `<button class="btn small" onclick="openDirectorScheduleEdit('${x.id}')">수정</button> <button class="btn small danger" onclick="deleteDirectorSchedule('${x.id}')">삭제</button>`
+    ]);
+  $("directorScheduleList").innerHTML=tableHtml(["날짜","시간","일정","장소","메모","등록자","관리"],rows);
 }
 
-window.recallCalendarEntry=async function(id,fromAdmin=false){
+async function saveDirectorScheduleForm(existing,selectedDate){
+  const title=await appPrompt("일정 제목을 입력하세요.",{
+    title:existing?"이사 일정 수정":"이사 일정 등록",
+    defaultValue:existing?.title||"",
+    placeholder:"예: 본사 회의"
+  });
+  if(title===null)return;
+  if(!title.trim()){toast("일정 제목을 입력하세요.");return}
+
+  const startTime=await appPrompt("시작 시간을 입력하세요. (HH:MM, 종일이면 비워두세요)",{
+    title:"시작 시간",
+    defaultValue:String(existing?.start_time||"").slice(0,5),
+    placeholder:"09:00"
+  });
+  if(startTime===null)return;
+
+  const endTime=await appPrompt("종료 시간을 입력하세요. (HH:MM, 없으면 비워두세요)",{
+    title:"종료 시간",
+    defaultValue:String(existing?.end_time||"").slice(0,5),
+    placeholder:"10:00"
+  });
+  if(endTime===null)return;
+
+  const location=await appPrompt("장소를 입력하세요. (선택)",{
+    title:"일정 장소",
+    defaultValue:existing?.location||"",
+    placeholder:"예: 본사 회의실"
+  });
+  if(location===null)return;
+
+  const memo=await appPrompt("메모를 입력하세요. (선택)",{
+    title:"일정 메모",
+    multiline:true,
+    defaultValue:existing?.memo||""
+  });
+  if(memo===null)return;
+
+  const row={
+    schedule_date:selectedDate,
+    title:title.trim(),
+    start_time:startTime.trim()||null,
+    end_time:endTime.trim()||null,
+    location:location.trim()||null,
+    memo:memo.trim()||null,
+    created_by:state.user.id,
+    created_by_name:state.profile?.name||""
+  };
+
+  let error;
+  if(existing){
+    ({error}=await supabaseClient.from("director_schedules").update(row).eq("id",existing.id));
+  }else{
+    ({error}=await supabaseClient.from("director_schedules").insert(row));
+  }
+  if(error){toast("이사 일정 저장 실패: "+error.message);return}
+
+  await loadDirectorSchedules();
+  renderDirectorSchedule();
+  toast(existing?"이사 일정을 수정했습니다.":"이사 일정을 등록했습니다.");
+}
+
+window.openDirectorScheduleCreate=async function(date){
+  if(!isScheduleAdmin()){toast("김헌정·손동오만 등록할 수 있습니다.");return}
+  await saveDirectorScheduleForm(null,date);
+};
+
+window.openDirectorScheduleEdit=async function(id){
+  if(!isScheduleAdmin()){toast("김헌정·손동오만 수정할 수 있습니다.");return}
+  const row=(state.directorSchedules||[]).find(x=>String(x.id)===String(id));
+  if(!row){toast("일정을 찾을 수 없습니다.");return}
+  await saveDirectorScheduleForm(row,row.schedule_date);
+};
+
+window.deleteDirectorSchedule=async function(id){
+  if(!isScheduleAdmin()){toast("김헌정·손동오만 삭제할 수 있습니다.");return}
+  const row=(state.directorSchedules||[]).find(x=>String(x.id)===String(id));
+  if(!(await appConfirm(`${row?.title||"이 일정"}을 삭제할까요?`,{title:"이사 일정 삭제"})))return;
+  const {error}=await supabaseClient.from("director_schedules").delete().eq("id",id);
+  if(error){toast("이사 일정 삭제 실패: "+error.message);return}
+  await loadDirectorSchedules();
+  renderDirectorSchedule();
+  toast("이사 일정을 삭제했습니다.");
+};
+
+window.recallCalendarEntry=async function(id){
   const row=(state.calendarEntries||[]).find(x=>String(x.id)===String(id));
   if(!row){toast("회수할 일정을 찾을 수 없습니다.");return}
 
@@ -1871,14 +1976,10 @@ window.recallCalendarEntry=async function(id,fromAdmin=false){
   if(!(await appConfirm(`${employeeName}의 ${label} 일정(${row.start_date}${row.end_date!==row.start_date?` ~ ${row.end_date}`:""})을 회수할까요?\n회수 즉시 달력에서 삭제되고 잔여 연차·대휴가 다시 계산됩니다.`,{title:"일정 회수"})))return;
 
   const {data,error}=await supabaseClient.rpc("recall_work_calendar_entry",{p_entry_id:String(id)});
-  if(error){
-    toast("일정 회수 실패: "+error.message);
-    return;
-  }
+  if(error){toast("일정 회수 실패: "+error.message);return}
 
   await loadCalendarEntries();
   renderCalendar();
-  if(isScheduleAdmin())renderScheduleAdmin();
   renderDashboard();
   toast(data?.message||`${label} 일정을 회수했습니다.`);
 };
@@ -3914,10 +4015,10 @@ $("closeCalendarFormBtn").onclick=()=>{$("calendarForm").classList.add("hidden")
 $("saveCalendarBtn").onclick=saveCalendarEntry;
 $("prevMonthBtn").onclick=()=>moveCalendarMonth(-1);$("nextMonthBtn").onclick=()=>moveCalendarMonth(1);
 $("todayBtn").onclick=()=>{state.calendarDate=new Date();renderCalendar()};
-$("refreshScheduleAdminBtn")?.addEventListener("click",async()=>{await loadCalendarEntries();renderScheduleAdmin();});
-$("scheduleAdminEmployeeFilter")?.addEventListener("change",renderScheduleAdmin);
-$("scheduleAdminMonthFilter")?.addEventListener("change",renderScheduleAdmin);
-$("scheduleAdminTypeFilter")?.addEventListener("change",renderScheduleAdmin);
+$("refreshDirectorScheduleBtn")?.addEventListener("click",async()=>{await loadDirectorSchedules();renderDirectorSchedule();});
+$("directorSchedulePrevBtn")?.addEventListener("click",()=>{state.directorScheduleDate=new Date(state.directorScheduleDate.getFullYear(),state.directorScheduleDate.getMonth()-1,1);renderDirectorSchedule();});
+$("directorScheduleNextBtn")?.addEventListener("click",()=>{state.directorScheduleDate=new Date(state.directorScheduleDate.getFullYear(),state.directorScheduleDate.getMonth()+1,1);renderDirectorSchedule();});
+$("directorScheduleTodayBtn")?.addEventListener("click",()=>{state.directorScheduleDate=new Date();renderDirectorSchedule();});
 $("calendarEmployeeFilter").onchange=()=>{
   const selected=$("calendarEmployeeFilter").value;
   if(has("calendar_manage")&&selected!=="all"&&$("calendarTargetEmployee")){

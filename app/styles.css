@@ -1035,3 +1035,9 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 /* V122 스케줄 관리 */
 .schedule-admin-filter{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px}
 @media(max-width:800px){.schedule-admin-filter{grid-template-columns:1fr}}
+
+/* V123 이사 스케줄 */
+.director-date-cell{cursor:pointer;transition:background .15s ease}
+.director-date-cell:hover{background:#f2f7ff}
+.director-schedule-event{display:block;width:100%;border:0;text-align:left;cursor:pointer}
+.director-schedule-event:hover{filter:brightness(.97)}
