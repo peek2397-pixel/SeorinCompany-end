@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "새 버전 번호를 입력하세요. 예: 1.16.1"
+        description: "새 버전 번호 (예: 1.16.3)"
         required: true
-        default: "1.16.1"
+        default: "1.16.3"
 
 permissions:
   contents: write
@@ -17,13 +17,21 @@ jobs:
 
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           package-manager-cache: false
+
+      - name: Check project files
+        shell: pwsh
+        run: |
+          Get-ChildItem
+          if (!(Test-Path "package.json")) {
+            throw "저장소 최상위에 package.json이 없습니다."
+          }
 
       - name: Apply version
         shell: pwsh
@@ -39,13 +47,13 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run build:win -- --publish always
 
-      - name: Check generated update files
+      - name: Verify update files
         shell: pwsh
         run: |
-          Get-ChildItem dist
+          Get-ChildItem dist -Recurse
 
           if (!(Test-Path "dist/latest.yml")) {
-            throw "latest.yml이 생성되지 않았습니다."
+            throw "dist/latest.yml이 생성되지 않았습니다."
           }
 
       - name: Upload build backup
