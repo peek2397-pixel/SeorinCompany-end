@@ -1850,12 +1850,17 @@ function renderDirectorSchedule(){
 
   for(let day=1;day<=last.getDate();day++){
     const date=`${month}-${String(day).padStart(2,"0")}`;
-    const schedules=(state.directorSchedules||[]).filter(x=>x.schedule_date===date);
+    const schedules=(state.directorSchedules||[]).filter(x=>{
+      const start=String(x.schedule_date||"");
+      const end=String(x.end_date||x.schedule_date||"");
+      return date>=start && date<=end;
+    });
     html+=`<div class="calendar-cell director-date-cell" onclick="openDirectorScheduleCreate('${date}')">
       <div class="calendar-day">${day}</div>
       <div class="calendar-events">
         ${schedules.map(x=>`<button type="button" class="calendar-event director-schedule-event" onclick="event.stopPropagation();openDirectorScheduleEdit('${x.id}')">
           <b>${escapeHtml(String(x.start_time||"").slice(0,5)||"종일")}</b> · ${escapeHtml(x.title||"일정")}
+          ${x.manager?`<span>담당 ${escapeHtml(x.manager)}</span>`:""}
           ${x.location?`<span>${escapeHtml(x.location)}</span>`:""}
         </button>`).join("")}
       </div>
@@ -1866,61 +1871,177 @@ function renderDirectorSchedule(){
   const rows=(state.directorSchedules||[])
     .filter(x=>String(x.schedule_date||"").slice(0,7)===month)
     .map(x=>[
-      x.schedule_date,
+      `${x.schedule_date}${x.end_date&&x.end_date!==x.schedule_date?` ~ ${x.end_date}`:""}`,
       `${String(x.start_time||"").slice(0,5)||"종일"}${x.end_time?` ~ ${String(x.end_time).slice(0,5)}`:""}`,
+      ({meeting:"회의",business:"업무 일정",visitor:"방문·미팅",trip:"출장",event:"행사",personal:"개인 일정",other:"기타"})[x.category]||"업무 일정",
       x.title||"",
+      x.manager||"",
+      Number(x.participant_count||0)+"명",
       x.location||"",
       x.memo||"",
-      x.created_by_name||"",
-      `<button class="btn small" onclick="openDirectorScheduleEdit('${x.id}')">수정</button> <button class="btn small danger" onclick="deleteDirectorSchedule('${x.id}')">삭제</button>`
+      `<button class="btn small" onclick="openDirectorScheduleEdit('${x.id}')">상세·수정</button>`
     ]);
-  $("directorScheduleList").innerHTML=tableHtml(["날짜","시간","일정","장소","메모","등록자","관리"],rows);
+  $("directorScheduleList").innerHTML=tableHtml(["날짜","시간","구분","일정명","담당자","참여 인원","장소","내용","관리"],rows);
 }
 
-async function saveDirectorScheduleForm(existing,selectedDate){
-  const title=await appPrompt("일정 제목을 입력하세요.",{
-    title:existing?"이사 일정 수정":"이사 일정 등록",
-    defaultValue:existing?.title||"",
-    placeholder:"예: 본사 회의"
-  });
-  if(title===null)return;
-  if(!title.trim()){toast("일정 제목을 입력하세요.");return}
+function openDirectorScheduleDetailForm(existing, selectedDate){
+  return new Promise(resolve=>{
+    document.getElementById("directorScheduleFormLayer")?.remove();
 
-  const startTime=await appPrompt("시작 시간을 입력하세요. (HH:MM, 종일이면 비워두세요)",{
-    title:"시작 시간",
-    defaultValue:String(existing?.start_time||"").slice(0,5),
-    placeholder:"09:00"
-  });
-  if(startTime===null)return;
+    const startDate=existing?.schedule_date||selectedDate;
+    const endDate=existing?.end_date||startDate;
+    const layer=document.createElement("div");
+    layer.id="directorScheduleFormLayer";
+    layer.className="director-schedule-form-layer";
 
-  const endTime=await appPrompt("종료 시간을 입력하세요. (HH:MM, 없으면 비워두세요)",{
-    title:"종료 시간",
-    defaultValue:String(existing?.end_time||"").slice(0,5),
-    placeholder:"10:00"
-  });
-  if(endTime===null)return;
+    const categoryOptions=[
+      ["meeting","회의"],
+      ["business","업무 일정"],
+      ["visitor","방문·미팅"],
+      ["trip","출장"],
+      ["event","행사"],
+      ["personal","개인 일정"],
+      ["other","기타"]
+    ];
 
-  const location=await appPrompt("장소를 입력하세요. (선택)",{
-    title:"일정 장소",
-    defaultValue:existing?.location||"",
-    placeholder:"예: 본사 회의실"
-  });
-  if(location===null)return;
+    layer.innerHTML=`
+      <div class="director-schedule-form-card" role="dialog" aria-modal="true">
+        <div class="director-form-head">
+          <div>
+            <h2>${existing?"이사 일정 수정":"이사 일정 등록"}</h2>
+            <small>날짜와 일정 내용을 자세히 입력하세요.</small>
+          </div>
+          <button type="button" class="director-form-close" aria-label="닫기">×</button>
+        </div>
 
-  const memo=await appPrompt("메모를 입력하세요. (선택)",{
-    title:"일정 메모",
-    multiline:true,
-    defaultValue:existing?.memo||""
+        <div class="director-form-grid">
+          <label>구분
+            <select id="directorFormCategory">
+              ${categoryOptions.map(([v,t])=>`<option value="${v}" ${String(existing?.category||"business")===v?"selected":""}>${t}</option>`).join("")}
+            </select>
+          </label>
+
+          <label>일정명
+            <input id="directorFormTitle" value="${escapeHtml(existing?.title||"")}" placeholder="예: 본사 경영회의" maxlength="150" />
+          </label>
+
+          <label>시작일
+            <input id="directorFormStartDate" type="date" value="${escapeHtml(startDate)}" />
+          </label>
+
+          <label>종료일
+            <input id="directorFormEndDate" type="date" value="${escapeHtml(endDate)}" />
+          </label>
+
+          <label>시작 시간
+            <input id="directorFormStartTime" type="time" value="${escapeHtml(String(existing?.start_time||"").slice(0,5))}" />
+          </label>
+
+          <label>종료 시간
+            <input id="directorFormEndTime" type="time" value="${escapeHtml(String(existing?.end_time||"").slice(0,5))}" />
+          </label>
+
+          <label>담당자
+            <input id="directorFormManager" value="${escapeHtml(existing?.manager||"김헌정")}" placeholder="예: 김헌정" maxlength="80" />
+          </label>
+
+          <label>참여 인원
+            <input id="directorFormParticipants" type="number" min="0" step="1" value="${Number(existing?.participant_count||0)}" />
+          </label>
+
+          <label class="span-2">장소
+            <input id="directorFormLocation" value="${escapeHtml(existing?.location||"")}" placeholder="예: 본사 3층 회의실" maxlength="200" />
+          </label>
+
+          <label class="span-2">일정 내용
+            <textarea id="directorFormMemo" rows="6" placeholder="준비물, 참석자, 참고사항 등 자세한 내용을 입력하세요.">${escapeHtml(existing?.memo||"")}</textarea>
+          </label>
+        </div>
+
+        <div class="director-form-actions">
+          ${existing?`<button type="button" class="btn danger" id="directorFormDeleteBtn">일정 삭제</button>`:""}
+          <span class="director-form-spacer"></span>
+          <button type="button" class="btn" id="directorFormCancelBtn">취소</button>
+          <button type="button" class="btn primary" id="directorFormSaveBtn">${existing?"수정 저장":"일정 저장"}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.append(layer);
+    document.body.classList.add("modal-open");
+
+    let done=false;
+    const finish=value=>{
+      if(done)return;
+      done=true;
+      document.removeEventListener("keydown",onKey,true);
+      layer.remove();
+      document.body.classList.remove("modal-open");
+      restorePortalInteraction();
+      resolve(value);
+    };
+
+    const onKey=e=>{
+      if(e.key==="Escape"){e.preventDefault();finish(null);}
+      if(e.key==="Enter" && !e.shiftKey && e.target?.tagName!=="TEXTAREA"){
+        e.preventDefault();
+        save();
+      }
+    };
+
+    const save=()=>{
+      const title=$("directorFormTitle")?.value.trim();
+      const startDateValue=$("directorFormStartDate")?.value;
+      const endDateValue=$("directorFormEndDate")?.value;
+      if(!title){toast("일정명을 입력하세요.");$("directorFormTitle")?.focus();return}
+      if(!startDateValue||!endDateValue){toast("시작일과 종료일을 입력하세요.");return}
+      if(endDateValue<startDateValue){toast("종료일은 시작일보다 빠를 수 없습니다.");return}
+
+      finish({
+        action:"save",
+        category:$("directorFormCategory")?.value||"business",
+        title,
+        schedule_date:startDateValue,
+        end_date:endDateValue,
+        start_time:$("directorFormStartTime")?.value||null,
+        end_time:$("directorFormEndTime")?.value||null,
+        manager:$("directorFormManager")?.value.trim()||null,
+        participant_count:Number($("directorFormParticipants")?.value||0),
+        location:$("directorFormLocation")?.value.trim()||null,
+        memo:$("directorFormMemo")?.value.trim()||null
+      });
+    };
+
+    document.addEventListener("keydown",onKey,true);
+    layer.querySelector(".director-form-close")?.addEventListener("click",()=>finish(null));
+    $("directorFormCancelBtn")?.addEventListener("click",()=>finish(null));
+    $("directorFormSaveBtn")?.addEventListener("click",save);
+    $("directorFormDeleteBtn")?.addEventListener("click",()=>finish({action:"delete"}));
+    layer.addEventListener("mousedown",e=>{if(e.target===layer)finish(null);});
+    setTimeout(()=>$("directorFormTitle")?.focus(),0);
   });
-  if(memo===null)return;
+}
+
+async function saveDirectorScheduleForm(existing, selectedDate){
+  const result=await openDirectorScheduleDetailForm(existing,selectedDate);
+  if(!result)return;
+
+  if(result.action==="delete"){
+    await deleteDirectorSchedule(existing.id);
+    return;
+  }
 
   const row={
-    schedule_date:selectedDate,
-    title:title.trim(),
-    start_time:startTime.trim()||null,
-    end_time:endTime.trim()||null,
-    location:location.trim()||null,
-    memo:memo.trim()||null,
+    category:result.category,
+    schedule_date:result.schedule_date,
+    end_date:result.end_date,
+    title:result.title,
+    start_time:result.start_time,
+    end_time:result.end_time,
+    manager:result.manager,
+    participant_count:result.participant_count,
+    location:result.location,
+    memo:result.memo,
     created_by:state.user.id,
     created_by_name:state.profile?.name||""
   };
