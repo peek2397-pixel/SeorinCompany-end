@@ -57,6 +57,52 @@ let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notic
 
 const $ = id => document.getElementById(id);
 
+// V108: Electron에서 confirm/저장/삭제 후 현재 창의 클릭 포커스가 잠기는 현상 복구
+function restorePortalInteraction(){
+  try{
+    document.documentElement.style.pointerEvents="";
+    document.body.style.pointerEvents="";
+    document.body.classList.remove("interaction-locked","is-loading","busy");
+    document.querySelectorAll("[aria-busy='true']").forEach(el=>el.removeAttribute("aria-busy"));
+    document.querySelectorAll(".loading-overlay,.screen-lock,.busy-layer,.modal-backdrop").forEach(el=>{
+      if(!el.classList.contains("org-edit-modal")){
+        el.style.pointerEvents="none";
+        if(el.dataset?.temporaryOverlay==="true")el.style.display="none";
+      }
+    });
+    const active=document.activeElement;
+    if(active && typeof active.blur==="function" && (active.tagName==="BUTTON" || active.getAttribute?.("role")==="button"))active.blur();
+    window.focus();
+  }catch(e){console.warn("화면 클릭 복구 실패",e);}
+}
+
+const nativeConfirm=window.confirm.bind(window);
+window.confirm=function(message){
+  let result=false;
+  try{return result=nativeConfirm(message);}
+  finally{
+    requestAnimationFrame(restorePortalInteraction);
+    setTimeout(restorePortalInteraction,30);
+    setTimeout(restorePortalInteraction,180);
+  }
+};
+
+window.addEventListener("focus",()=>setTimeout(restorePortalInteraction,0));
+window.addEventListener("pageshow",restorePortalInteraction);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)restorePortalInteraction();});
+document.addEventListener("pointerdown",()=>{
+  if(document.body.style.pointerEvents==="none" || document.documentElement.style.pointerEvents==="none")restorePortalInteraction();
+},{capture:true});
+
+// 비동기 저장/삭제가 끝난 뒤에도 포커스를 반드시 돌려줌
+const nativeFetch=window.fetch?.bind(window);
+if(nativeFetch){
+  window.fetch=async(...args)=>{
+    try{return await nativeFetch(...args);}
+    finally{setTimeout(restorePortalInteraction,0);}
+  };
+}
+
 window.addEventListener("error",e=>{
   console.error("화면 스크립트 오류",e.error||e.message);
   const t=document.getElementById("toast");

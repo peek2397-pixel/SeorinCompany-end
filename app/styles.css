@@ -996,3 +996,10 @@ body.modal-open{overflow:hidden}
 .dinner-chat-list-item:hover .dinner-list-more,.dinner-chat-list-item.active .dinner-list-more{opacity:1}
 .dinner-list-more:hover{background:#ffe8e8;color:#c62828}
 @media(min-width:1101px){.dinner-right-column{grid-template-columns:320px minmax(480px,1fr);grid-template-rows:auto;align-items:start}.dinner-room-list-panel{grid-column:1;grid-row:1;position:sticky;top:10px}.dinner-chat-side{grid-column:2;grid-row:1;min-height:650px}.dinner-right-column{grid-column:2;grid-row:1/3;display:grid}.dinner-layout{grid-template-columns:minmax(420px,.82fr) minmax(800px,1.55fr)}}
+
+/* V108: 저장·삭제 후 투명 클릭 차단층이 남지 않도록 안전장치 */
+html,body{pointer-events:auto}
+body:not(.modal-open)>.modal-backdrop,
+body:not(.modal-open)>.loading-overlay,
+body:not(.modal-open)>.screen-lock,
+body:not(.modal-open)>.busy-layer{pointer-events:none!important}
