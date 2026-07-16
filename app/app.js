@@ -346,8 +346,10 @@ async function createDinnerRoom(){
   const memberRows=members.map(m=>({room_id:roomId,user_id:m.user_id,member_name:m.member_name}));
   const memberUpsert=await supabaseClient.from('dinner_room_members').upsert(memberRows,{onConflict:'room_id,user_id'});
   if(memberUpsert.error)console.warn('참여자 보강 저장 실패',memberUpsert.error);
-  const optimistic={id:roomId,title,dinner_date:dinnerDate,created_by:state.user.id,created_by_name:state.profile?.name||'관리자',created_at:new Date().toISOString(),member_count:members.length};
+  const optimistic={id:roomId,title,dinner_date:dinnerDate,created_by:state.user.id,created_by_name:state.profile?.name||'관리자',created_at:new Date().toISOString(),member_count:members.length,_members:memberRows.map(x=>({...x,id:`local-${x.user_id}`,joined_at:new Date().toISOString()}))};
   state.dinnerRooms=[optimistic,...(state.dinnerRooms||[]).filter(r=>String(r.id)!==String(roomId))];
+  state.dinnerRoomMembers=optimistic._members||[];
+  state.dinnerOnlineUserIds=new Set([String(state.user.id)]);
   renderDinnerRooms();
   clearDinnerRoomForm();
   await selectDinnerRoom(roomId);
@@ -395,7 +397,12 @@ async function selectDinnerRoom(roomId){
   state.selectedDinnerRoomId=roomId;renderDinnerRooms();
   const room=(state.dinnerRooms||[]).find(x=>String(x.id)===String(roomId));if(!room)return;
   let memberRes=await supabaseClient.from('dinner_room_members').select('id,room_id,user_id,member_name,joined_at').eq('room_id',roomId).order('member_name');
-  if(memberRes.error){toast('회식방 참여자 조회 실패: '+memberRes.error.message);return;}
+  if(memberRes.error){
+    console.error('회식방 참여자 조회 실패',memberRes.error);
+    const fallback=room._members||state.dinnerRoomMembers||[];
+    if(!fallback.length){toast('회식방 참여자 조회 실패: '+memberRes.error.message);return;}
+    memberRes={data:fallback,error:null};
+  }
   if(!(memberRes.data||[]).length&&String(room.created_by)===String(state.user.id)){
     await supabaseClient.from('dinner_room_members').upsert({room_id:roomId,user_id:state.user.id,member_name:state.profile?.name||'관리자'},{onConflict:'room_id,user_id'});
     memberRes=await supabaseClient.from('dinner_room_members').select('id,room_id,user_id,member_name,joined_at').eq('room_id',roomId).order('member_name');
@@ -405,7 +412,7 @@ async function selectDinnerRoom(roomId){
     supabaseClient.from('dinner_menu_votes').select('*').eq('room_id',roomId),
     supabaseClient.from('dinner_room_messages').select('*').eq('room_id',roomId).order('created_at')
   ]);
-  state.dinnerRoomMembers=memberRes.data||[];state.dinnerMenuOptions=o.data||[];state.dinnerMenuVotes=v.data||[];state.dinnerRoomMessages=c.data||[];
+  state.dinnerRoomMembers=memberRes.data||[];room._members=state.dinnerRoomMembers;state.dinnerMenuOptions=o.data||[];state.dinnerMenuVotes=v.data||[];state.dinnerRoomMessages=c.data||[];
   room.member_count=state.dinnerRoomMembers.length;
   $('dinnerRoomWorkspace')?.classList.remove('hidden');$('dinnerChatPanel')?.classList.remove('hidden');
   if($('dinnerWorkspaceTitle'))$('dinnerWorkspaceTitle').textContent=room.title;
@@ -416,7 +423,7 @@ async function selectDinnerRoom(roomId){
   renderDinnerRooms();renderDinnerWorkspace();renderDinnerChat();setupDinnerChatRealtime(roomId);setupDinnerPresence(roomId);activateDinnerTab('members');
 }
 function renderDinnerWorkspace(){
-  const members=$("dinnerRoomMembers");if(members){const room=(state.dinnerRooms||[]).find(r=>String(r.id)===String(state.selectedDinnerRoomId));members.innerHTML=(state.dinnerRoomMembers||[]).map(x=>{const online=state.dinnerOnlineUserIds.has(String(x.user_id));const isOwner=room&&String(room.created_by)===String(x.user_id);return `<span class="dinner-member-card ${online?'online':'offline'}"><i class="presence-dot"></i><b>${escapeHtml(x.member_name||'직원')}</b>${isOwner?'<small class="room-owner-label">방장</small>':''}<small>${online?'접속 중':'미접속'}</small></span>`;}).join('');}
+  const members=$("dinnerRoomMembers");if(members){const room=(state.dinnerRooms||[]).find(r=>String(r.id)===String(state.selectedDinnerRoomId));members.innerHTML=(state.dinnerRoomMembers||[]).length?(state.dinnerRoomMembers||[]).map(x=>{const online=state.dinnerOnlineUserIds.has(String(x.user_id));const isOwner=room&&String(room.created_by)===String(x.user_id);return `<span class="dinner-member-card ${online?'online':'offline'}"><i class="presence-dot"></i><b>${escapeHtml(x.member_name||'직원')}</b>${isOwner?'<small class="room-owner-label">방장</small>':''}<small>${online?'접속 중':'미접속'}</small></span>`;}).join(''):'<div class="empty">참여자가 없습니다.</div>';}
   const voteBox=$("dinnerMenuVoteList");if(voteBox){const counts=new Map();(state.dinnerMenuVotes||[]).forEach(v=>counts.set(String(v.option_id),(counts.get(String(v.option_id))||0)+1));const mine=new Set((state.dinnerMenuVotes||[]).filter(v=>String(v.user_id)===String(state.user.id)).map(v=>String(v.option_id)));voteBox.innerHTML=(state.dinnerMenuOptions||[]).length?state.dinnerMenuOptions.map(o=>`<div class="menu-vote-row"><b>${escapeHtml(o.menu_name)}</b><span>${counts.get(String(o.id))||0}표</span><button type="button" class="btn ${mine.has(String(o.id))?'primary':''}" data-vote-menu="${escapeHtml(String(o.id))}">${mine.has(String(o.id))?'선택함':'선택'}</button></div>`).join(''):'<div class="empty">메뉴 후보를 추가하세요.</div>';voteBox.querySelectorAll('[data-vote-menu]').forEach(b=>b.addEventListener('click',()=>voteDinnerMenu(b.dataset.voteMenu)));}
 }
 async function addDinnerMenu(){const name=($("dinnerMenuCandidate")?.value||'').trim();if(!state.selectedDinnerRoomId||!name){toast('메뉴 후보를 입력하세요.');return;}const {error}=await supabaseClient.from('dinner_menu_options').insert({room_id:state.selectedDinnerRoomId,menu_name:name,created_by:state.user.id});if(error){toast('메뉴 추가 실패: '+error.message);return;}$("dinnerMenuCandidate").value='';await selectDinnerRoom(state.selectedDinnerRoomId);activateDinnerTab('menu');}
@@ -431,7 +438,8 @@ function runDinnerPenaltyRoom(){const names=dinnerMemberNames(),items=($("dinner
 function activateDinnerTab(tab){document.querySelectorAll('.dinner-tab').forEach(b=>b.classList.toggle('primary',b.dataset.dtab===tab));['members','menu','ladder','roulette','teams','seats','penalty'].forEach(x=>$("dinnerTab"+x[0].toUpperCase()+x.slice(1))?.classList.toggle('hidden',x!==tab));}
 async function setupDinnerPresence(roomId){
   if(state.dinnerPresenceChannel){try{await state.dinnerPresenceChannel.untrack();}catch(_){ }try{await supabaseClient.removeChannel(state.dinnerPresenceChannel);}catch(_){ }}
-  state.dinnerOnlineUserIds=new Set();
+  state.dinnerOnlineUserIds=new Set([String(state.user.id)]);
+  renderDinnerWorkspace();
   const channel=supabaseClient.channel(`dinner-presence-${roomId}`,{config:{presence:{key:String(state.user.id)}}});
   state.dinnerPresenceChannel=channel;
   const sync=()=>{const presence=channel.presenceState()||{};const online=new Set();Object.entries(presence).forEach(([key,entries])=>{online.add(String(key));(entries||[]).forEach(e=>{if(e?.user_id)online.add(String(e.user_id));});});state.dinnerOnlineUserIds=online;renderDinnerWorkspace();};
