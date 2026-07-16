@@ -4042,3 +4042,86 @@ document.addEventListener("click",e=>{
 try{if($("businessTripStart"))$("businessTripStart").value=isoDateOffset(0);if($("businessTripEnd"))$("businessTripEnd").value=isoDateOffset(0);if($("businessTripMonth"))$("businessTripMonth").value=isoDateOffset(0).slice(0,7);if($("transportMaintenanceDate"))$("transportMaintenanceDate").value=isoDateOffset(0);}catch(_){}
 
 window.addEventListener('beforeunload',()=>{try{state.dinnerPresenceChannel?.untrack();}catch(_){}});
+
+
+// V115 Windows 자동 업데이트
+(function setupSeorinAutoUpdateUi(){
+  const desktop = window.seorinDesktop;
+  const btn = document.getElementById("updateAppBtn");
+  const label = document.getElementById("updateAppLabel");
+  const versionLabel = document.getElementById("appVersionLabel");
+  if(!btn || !label || !versionLabel) return;
+
+  const setState = (state, text, detail) => {
+    btn.classList.remove("is-available","is-downloading","is-ready","is-error");
+    if(state) btn.classList.add(state);
+    label.textContent = text;
+    versionLabel.textContent = detail || "";
+  };
+
+  if(!desktop){
+    setState("", "웹 버전", "자동 업데이트는 설치 앱에서 사용");
+    btn.disabled = true;
+    return;
+  }
+
+  desktop.getAppVersion?.().then(version => {
+    versionLabel.textContent = `현재 ${version}`;
+  }).catch(() => {
+    versionLabel.textContent = "현재 버전 확인 실패";
+  });
+
+  let currentAction = "check";
+  btn.addEventListener("click", async () => {
+    try{
+      if(currentAction === "download"){
+        setState("is-downloading","다운로드 시작","잠시만 기다려주세요");
+        await desktop.downloadUpdate();
+      }else if(currentAction === "install"){
+        setState("is-ready","재시작 중","업데이트를 설치합니다");
+        await desktop.installUpdate();
+      }else{
+        setState("is-downloading","업데이트 확인 중","GitHub Release 확인");
+        await desktop.checkForUpdates();
+      }
+    }catch(error){
+      setState("is-error","업데이트 오류",error?.message || "다시 시도하세요");
+      currentAction = "check";
+    }
+  });
+
+  desktop.onUpdateStatus?.((payload) => {
+    const current = payload.currentVersion || "";
+    switch(payload.status){
+      case "checking":
+      case "busy":
+        currentAction = "check";
+        setState("is-downloading","업데이트 확인 중",current ? `현재 ${current}` : "확인 중");
+        break;
+      case "available":
+        currentAction = "download";
+        setState("is-available","새 버전 다운로드",`${current || "-"} → ${payload.version || payload.availableVersion || "-"}`);
+        break;
+      case "downloading":
+        currentAction = "download";
+        setState("is-downloading",`다운로드 ${Number(payload.percent || 0)}%`,payload.availableVersion ? `새 버전 ${payload.availableVersion}` : "업데이트 다운로드 중");
+        break;
+      case "downloaded":
+        currentAction = "install";
+        setState("is-ready","재시작 후 설치",`새 버전 ${payload.version || payload.availableVersion || ""}`);
+        break;
+      case "not-available":
+        currentAction = "check";
+        setState("","최신 버전",current ? `현재 ${current}` : "업데이트 없음");
+        break;
+      case "dev-mode":
+        currentAction = "check";
+        setState("","개발 실행",payload.message || "");
+        break;
+      case "error":
+        currentAction = "check";
+        setState("is-error","업데이트 다시 확인",payload.message || "오류 발생");
+        break;
+    }
+  });
+})();

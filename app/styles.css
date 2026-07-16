@@ -1005,3 +1005,15 @@ body:not(.modal-open)>.screen-lock,
 body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 
 .transport-badge{display:inline-flex;align-items:center;padding:1px 6px;margin-left:4px;border-radius:999px;background:#e8f0ff;color:#1d4ed8;font-size:10px;font-weight:800;line-height:1.4;vertical-align:middle}
+
+
+/* V115 자동 업데이트 */
+.topbar-actions{display:flex;align-items:center;gap:12px}
+.update-btn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:126px;height:50px;padding:7px 12px;border:1px solid #cbdaf3;background:#f7faff}
+.update-btn:hover{border-color:var(--accent);background:#eef5ff}
+.update-btn small{display:block;margin-top:2px;font-size:10px;color:var(--muted)}
+.update-btn.is-available{border-color:#f59e0b;background:#fff8e8;color:#92400e}
+.update-btn.is-downloading{border-color:#2563eb;background:#eef5ff;color:#1d4ed8}
+.update-btn.is-ready{border-color:#16a34a;background:#ecfdf3;color:#166534}
+.update-btn.is-error{border-color:#dc2626;background:#fff1f2;color:#991b1b}
+@media(max-width:850px){.topbar-actions{gap:6px}.update-btn{min-width:105px}.update-btn small{display:none}}
