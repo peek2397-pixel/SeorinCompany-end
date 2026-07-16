@@ -477,22 +477,24 @@
         <div class="panel my-leave-summary">
           <div class="panel-head compact-head">
             <div>
-              <h3 id="leaveSummaryTitle">내 연차·대체휴무 현황</h3>
-              <small>달력에 등록된 사용내역을 기준으로 계산됩니다.</small>
+              <h3 id="leaveSummaryTitle">내 휴가 잔여 현황</h3>
+              <small>로그인한 직원의 현재 남은 수량만 표시합니다.</small>
             </div>
           </div>
-          <div class="leave-summary-row">
-            <strong>연차</strong>
-            <span>부여 <b id="annualGranted">0일</b></span>
-            <span>사용 <b id="annualUsed">0일</b></span>
-            <span>잔여 <b id="annualBalance">0일</b></span>
+          <div class="leave-balance-only-grid">
+            <div class="leave-balance-card">
+              <span>남은 연차</span>
+              <strong id="annualBalance">0일</strong>
+            </div>
+            <div class="leave-balance-card">
+              <span>남은 대체휴무</span>
+              <strong id="compBalance">0일</strong>
+            </div>
           </div>
-          <div class="leave-summary-row">
-            <strong>대체휴무</strong>
-            <span>발생 <b id="weekendCredit">0일</b></span>
-            <span>사용 <b id="compUsed">0일</b></span>
-            <span>잔여 <b id="compBalance">0일</b></span>
-          </div>
+          <span id="annualGranted" class="hidden">0일</span>
+          <span id="annualUsed" class="hidden">0일</span>
+          <span id="weekendCredit" class="hidden">0일</span>
+          <span id="compUsed" class="hidden">0일</span>
         </div>
 
         <div id="calendarForm" class="panel hidden">

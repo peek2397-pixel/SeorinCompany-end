@@ -1429,7 +1429,7 @@ function renderCalendarEmployeeFilter(){
       ...state.employees.map(e=>`<option value="${e.id}">${escapeHtml(e.name)} · ${escapeHtml(e.team||"")} · ${escapeHtml(e.position||"")}</option>`)
     ];
     sel.innerHTML=options.join("");
-    sel.value=[...sel.options].some(o=>o.value===old)?old:"all";
+    sel.value=[...sel.options].some(o=>o.value===old)?old:(state.user?.id||"all");
   }else{
     sel.innerHTML=`<option value="${state.user.id}">내 일정</option>`;
     sel.value=state.user.id;
@@ -1505,34 +1505,20 @@ function renderCalendar(){
 
   $("workCalendar").innerHTML=html+`</div>`;
 
-  // 전체 직원 선택 시 요약카드는 전체 합계, 개인 선택 시 해당 직원 잔액
-  if(filter==="all"&&has("calendar_manage")){
-    const annualGrantedTotal=state.employees.reduce((sum,e)=>sum+Number(e.annual_leave_granted||0),0);
-    const annualUsedTotal=entries.filter(x=>["annual","half","quarter"].includes(x.event_type)).reduce((a,x)=>a+Number(x.days||0),0);
-    const weekendCreditTotal=entries.filter(x=>x.event_type==="weekend_work").reduce((a,x)=>a+Number(x.days||0)*1.5,0);
-    const compUsedTotal=entries.filter(x=>x.event_type==="comp_used").reduce((a,x)=>a+Number(x.days||0),0);
+  // V116: 합계 대신 로그인 직원(또는 선택한 직원)의 현재 잔여 수량만 표시
+  const selectedId = filter==="all" ? state.user.id : filter;
+  const employee = state.employees.find(e=>String(e.id)===String(selectedId)) || state.profile;
+  const stats = employeeLeaveStats(selectedId, employee?.annual_leave_granted);
 
-    $("annualGranted").textContent=formatDays(annualGrantedTotal)+"일";
-    $("annualUsed").textContent=formatDays(annualUsedTotal)+"일";
-    $("annualBalance").textContent=formatDays(annualGrantedTotal-annualUsedTotal)+"일";
-    $("weekendCredit").textContent=formatDays(weekendCreditTotal)+"일";
-    $("compUsed").textContent=formatDays(compUsedTotal)+"일";
-    $("compBalance").textContent=formatDays(weekendCreditTotal-compUsedTotal)+"일";
-  }else{
-    const selectedId=filter==="all"?state.user.id:filter;
-    const mine=state.calendarEntries.filter(x=>x.employee_id===selectedId);
-    const employee=state.employees.find(e=>e.id===selectedId)||state.profile;
-    const granted=Number(employee?.annual_leave_granted||0);
-    const annualUsed=mine.filter(x=>["annual","half","quarter"].includes(x.event_type)).reduce((a,x)=>a+Number(x.days||0),0);
-    const weekendCredit=mine.filter(x=>x.event_type==="weekend_work").reduce((a,x)=>a+Number(x.days||0)*1.5,0);
-    const compUsed=mine.filter(x=>x.event_type==="comp_used").reduce((a,x)=>a+Number(x.days||0),0);
+  $("annualGranted").textContent = formatDays(stats.granted||0)+"일";
+  $("annualUsed").textContent = formatDays(stats.annualUsed||0)+"일";
+  $("annualBalance").textContent = formatDays(stats.annualBalance||0)+"일";
+  $("weekendCredit").textContent = formatDays(stats.compGranted||0)+"일";
+  $("compUsed").textContent = formatDays(stats.compUsed||0)+"일";
+  $("compBalance").textContent = formatDays(stats.compBalance||0)+"일";
 
-    $("annualGranted").textContent=formatDays(granted)+"일";
-    $("annualUsed").textContent=formatDays(annualUsed)+"일";
-    $("annualBalance").textContent=formatDays(granted-annualUsed)+"일";
-    $("weekendCredit").textContent=formatDays(weekendCredit)+"일";
-    $("compUsed").textContent=formatDays(compUsed)+"일";
-    $("compBalance").textContent=formatDays(weekendCredit-compUsed)+"일";
+  if($("leaveSummaryTitle")){
+    $("leaveSummaryTitle").textContent = `${employee?.name||"내"} 휴가 잔여 현황`;
   }
 
   $("calendarHistory").innerHTML=table(

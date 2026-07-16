@@ -1017,3 +1017,10 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 .update-btn.is-ready{border-color:#16a34a;background:#ecfdf3;color:#166534}
 .update-btn.is-error{border-color:#dc2626;background:#fff1f2;color:#991b1b}
 @media(max-width:850px){.topbar-actions{gap:6px}.update-btn{min-width:105px}.update-btn small{display:none}}
+
+/* V116 내 휴가 잔여 수량만 표시 */
+.leave-balance-only-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.leave-balance-card{border:1px solid #d7e2f2;border-radius:12px;background:#f8fbff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between}
+.leave-balance-card span{font-weight:700;color:#4b5f79}
+.leave-balance-card strong{font-size:24px;color:#145ce6}
+@media(max-width:700px){.leave-balance-only-grid{grid-template-columns:1fr}}
