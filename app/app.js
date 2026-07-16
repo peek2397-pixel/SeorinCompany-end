@@ -53,7 +53,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -478,6 +478,20 @@ function setupDinnerChatRealtime(roomId){
 async function openDinnerRoomFromAlert(roomId){try{window.focus();}catch(_){}goPage('dinner');await loadDinnerRooms();renderDinnerRooms();setTimeout(()=>selectDinnerRoom(roomId),150);}
 function showDinnerRoomNotification(room){if(!('Notification' in window)||Notification.permission!=='granted')return;setTimeout(()=>{const n=new Notification('서린 물류 포털 · 새 회식방',{body:`${room.title||'회식방'}에 초대되었습니다. 클릭하면 바로 입장합니다.`,icon:'../build/icon.png',requireInteraction:true});n.onclick=()=>{n.close();openDinnerRoomFromAlert(room.id);};},4000);}
 function setupDinnerRoomRealtime(){if(state.dinnerAlertChannel)supabaseClient.removeChannel(state.dinnerAlertChannel);state.dinnerAlertChannel=supabaseClient.channel('dinner-invite-'+state.user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'dinner_room_members',filter:`user_id=eq.${state.user.id}`},async payload=>{const {data}=await supabaseClient.from('dinner_rooms').select('id,title,dinner_date').eq('id',payload.new.room_id).single();await loadDinnerRooms();renderDinnerRooms();if(data)showDinnerRoomNotification(data);}).subscribe();}
+function setupDinnerMessageNotifications(){
+  if(!state.user)return;
+  if(state.dinnerMessageNotificationChannel)supabaseClient.removeChannel(state.dinnerMessageNotificationChannel);
+  state.dinnerMessageNotificationChannel=supabaseClient.channel(`dinner-message-notifications-${state.user.id}`)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"dinner_room_messages"},async payload=>{
+      const msg=payload.new||{};
+      if(String(msg.sender_id)===String(state.user.id))return;
+      const isMember=(state.dinnerRooms||[]).some(r=>String(r.id)===String(msg.room_id));
+      if(!isMember)return;
+      if(String(state.selectedDinnerRoomId)===String(msg.room_id)&&document.getElementById("dinnerPage")?.classList.contains("active"))return;
+      const room=(state.dinnerRooms||[]).find(r=>String(r.id)===String(msg.room_id));
+      showChatWindowsNotification({title:`${room?.title||"회식방"} · ${msg.sender_name||"직원"}`,body:String(msg.message_text||"새 메시지").slice(0,180),page:"dinner",targetId:String(msg.room_id||""),tag:"dinner-message"});
+    }).subscribe();
+}
 
 window.createDinnerRoom=createDinnerRoom;
 
@@ -641,7 +655,7 @@ async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();lo
 
 async function refreshAll(){
   await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 async function loadCards(){
   if(!has("card_use"))return;
@@ -794,6 +808,85 @@ function setupNoticeRealtime(){
     .subscribe();
 }
 
+
+
+function notificationTargetPage(type,page){
+  if(page)return page;
+  const map={notice:"notices",purchase:"purchase",dinner:"dinner",inventory:"inventory",event:"events",meeting:"meetings",trip:"trips",vehicle:"vehicles",chat:"community"};
+  return map[String(type||"").toLowerCase()]||"dashboard";
+}
+async function openUnifiedNotification(payload={}){
+  const page=notificationTargetPage(payload.notification_type||payload.type,payload.target_page||payload.page);
+  try{window.focus()}catch(_){ }
+  goPage(page);
+  if(page==="dinner"&&payload.target_id){
+    await loadDinnerRooms();renderDinnerRooms();
+    if(state.dinnerRooms.some(r=>String(r.id)===String(payload.target_id)))await openDinnerRoom(String(payload.target_id));
+  }
+  if(page==="community"){
+    await loadMessengerRooms();
+    const roomId=payload.target_id||"global";
+    await selectMessengerRoom(roomId);
+  }
+  if(page==="private"){
+    await loadPrivateMessages();
+    if(payload.target_id)state.selectedPrivateMessageId=String(payload.target_id);
+    renderPrivate();
+  }
+  if(page==="purchase"){await loadPurchaseRequests();renderPurchases()}
+  if(page==="notices"){await loadNotices();renderNotices()}
+}
+function showUnifiedWindowsNotification(row){
+  if(!row)return;
+  const payload={
+    id:String(row.id||""),
+    title:`서린컴퍼니 · ${row.title||"새 알림"}`,
+    body:String(row.body||"새로운 내용이 등록되었습니다."),
+    notification_type:row.notification_type||"general",
+    target_page:notificationTargetPage(row.notification_type,row.target_page),
+    target_id:row.target_id?String(row.target_id):""
+  };
+  if(window.seorinDesktop?.showNotification){
+    window.seorinDesktop.showNotification(payload);
+    return;
+  }
+  if("Notification" in window&&Notification.permission==="granted"){
+    const n=new Notification(payload.title,{body:payload.body,tag:`seorin-all-${payload.id}`,requireInteraction:true});
+    n.onclick=()=>openUnifiedNotification(payload);
+  }
+}
+function showChatWindowsNotification({title,body,page="community",targetId="",tag="chat"}={}){
+  showUnifiedWindowsNotification({
+    id:`${tag}-${targetId||"global"}-${Date.now()}`,
+    title:title||"새 채팅 메시지",
+    body:body||"새 메시지가 도착했습니다.",
+    notification_type:"chat",
+    target_page:page,
+    target_id:targetId||""
+  });
+}
+async function profileNameById(userId){
+  if(!userId)return "직원";
+  const cached=(state.employees||[]).find(x=>String(x.id)===String(userId));
+  if(cached?.name)return cached.name;
+  const {data}=await supabaseClient.from("profiles").select("name").eq("id",userId).maybeSingle();
+  return data?.name||"직원";
+}
+
+function bindUnifiedNotificationClick(){
+  if(state.appNotificationClickBound)return;
+  state.appNotificationClickBound=true;
+  if(window.seorinDesktop?.onNotificationClick)window.seorinDesktop.onNotificationClick(openUnifiedNotification);
+}
+function setupUnifiedAppNotifications(){
+  bindUnifiedNotificationClick();
+  if(state.appNotificationChannel)supabaseClient.removeChannel(state.appNotificationChannel);
+  state.appNotificationChannel=supabaseClient.channel(`seorin-all-notifications-${state.user.id}`)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"app_notifications"},payload=>{
+      showUnifiedWindowsNotification(payload.new);
+    })
+    .subscribe(status=>{if(status==="CHANNEL_ERROR")console.warn("통합 알림 채널 연결 실패")});
+}
 
 function workAckStorageKey(){return `seorin_work_alert_ack_${state.user?.id||"guest"}`}
 function getAcknowledgedWorkKeys(){try{const v=JSON.parse(localStorage.getItem(workAckStorageKey())||"[]");return new Set(Array.isArray(v)?v.map(String):[])}catch(_){return new Set()}}
@@ -1161,15 +1254,26 @@ function setupChatRealtime(){
   const channel=supabaseClient
     .channel("seorin-messenger-v41")
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},async payload=>{
+      const msg=payload.new||{};
       if((state.selectedMessengerRoom||"global")==="global"){
         await loadChatMessages();renderChat();
       }
+      if(String(msg.sender_id)!==String(state.user?.id)){
+        const sender=await profileNameById(msg.sender_id);
+        showChatWindowsNotification({title:`전체 소통방 · ${sender}`,body:String(msg.content||"새 메시지").slice(0,180),page:"community",targetId:"global",tag:"global-chat"});
+      }
     })
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"messenger_messages"},async payload=>{
+      const msg=payload.new||{};
       await loadMessengerRooms();
       renderMessengerRooms();
-      if(payload.new?.room_id===state.selectedMessengerRoom){
+      if(msg.room_id===state.selectedMessengerRoom){
         await loadChatMessages();renderChat();
+      }
+      if(String(msg.sender_id)!==String(state.user?.id)){
+        const sender=await profileNameById(msg.sender_id);
+        const room=state.messengerRooms.find(r=>String(r.room_id)===String(msg.room_id));
+        showChatWindowsNotification({title:`${room?.display_name||"직원 채팅방"} · ${sender}`,body:String(msg.content||"새 메시지").slice(0,180),page:"community",targetId:String(msg.room_id||""),tag:"messenger-chat"});
       }
     })
     .subscribe(status=>{
@@ -1177,6 +1281,30 @@ function setupChatRealtime(){
       if(el)el.textContent=status==="SUBSCRIBED"?"실시간 연결됨":"연결 중";
     });
   state.chatChannel=channel;
+}
+
+function setupPrivateMessageNotifications(){
+  if(!has("private_messages_use")||!state.user)return;
+  if(state.privateNotificationChannel)supabaseClient.removeChannel(state.privateNotificationChannel);
+  state.privateNotificationChannel=supabaseClient.channel(`private-notifications-${state.user.id}`)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"private_messages",filter:`recipient_id=eq.${state.user.id}`},async payload=>{
+      const row=payload.new||{};
+      if(String(row.sender_id)===String(state.user.id))return;
+      const sender=await profileNameById(row.sender_id);
+      showChatWindowsNotification({title:`1:1 비밀소통 · ${sender}`,body:String(row.title||row.content||"새 비밀소통").slice(0,180),page:"private",targetId:String(row.id||""),tag:"private-message"});
+      await loadPrivateMessages();renderPrivate();
+    })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"private_message_replies"},async payload=>{
+      const reply=payload.new||{};
+      if(String(reply.sender_id)===String(state.user.id))return;
+      const {data:thread}=await supabaseClient.from("private_messages").select("id,sender_id,recipient_id,title").eq("id",reply.message_id).maybeSingle();
+      if(!thread)return;
+      if(![String(thread.sender_id),String(thread.recipient_id)].includes(String(state.user.id)))return;
+      const sender=await profileNameById(reply.sender_id);
+      showChatWindowsNotification({title:`비밀소통 답장 · ${sender}`,body:String(reply.content||thread.title||"새 답장").slice(0,180),page:"private",targetId:String(thread.id),tag:"private-reply"});
+      await loadPrivateMessages();renderPrivate();
+    })
+    .subscribe();
 }
 
 async function openMessengerRoomModal(){
@@ -2193,7 +2321,7 @@ function getOrganizationPeople(){
 
   people.forEach(p=>{
     if(p.name==="김헌정"){p.team="발주팀";p.position="주임"}
-    if(p.name==="성경진"){p.team="B2C";p.position="대리"}
+    if(p.name==="성경진"){p.team="B2C";p.position="팀장대행"}
     if(p.name==="정해림"){p.team="B2C";p.position="차장";p.on_leave=true}
   });
   return people;
@@ -2235,6 +2363,18 @@ function getTeamLeader(teamName,members){
     || members.find(p=>/팀장/.test(String(p.position||"")))
     || members.find(p=>Number(p.org_level)===2)
     || members[0];
+}
+
+function orgNameExtraBadge(person){
+  if(["신태선","엄수현"].includes(String(person?.name||""))){
+    return `<span class="transport-badge">운송</span>`;
+  }
+  return "";
+}
+function orgLeaderRole(person){
+  if(String(person?.name||"")==="성경진")return "팀장대행";
+  const position=String(person?.position||"");
+  return /팀장대행/.test(position)?"팀장대행":/팀장/.test(position)?position:"팀장";
 }
 
 function renderOrg(){
@@ -2309,9 +2449,9 @@ function renderOrg(){
 
       <div class="org-team-leader" ${leader?`onclick="openOrgPerson('${escapeHtml(leader.emp_no)}')"`:""}>
         ${leader?`
-          <div class="leader-badge">팀장</div>
-          <div class="leader-name">${escapeHtml(leader.name)} ${leader.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</div>
-          <div class="leader-position">${escapeHtml(/팀장/.test(String(leader.position||""))?leader.position:"팀장")}</div>
+          <div class="leader-badge">${escapeHtml(orgLeaderRole(leader))}</div>
+          <div class="leader-name">${escapeHtml(leader.name)} ${orgNameExtraBadge(leader)} ${leader.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</div>
+          <div class="leader-position">${escapeHtml(orgLeaderRole(leader))}</div>
           ${state.orgEditMode?`<button class="btn small" onclick="selectOrgPerson('${escapeHtml(leader.emp_no)}')">수정</button>`:""}
         `:`<div class="empty compact-empty">팀장 미지정</div>`}
       </div>
@@ -2322,7 +2462,7 @@ function renderOrg(){
       const statusClass=member.pending_approval?"pending":member.move_planned?"moving":"";
       html+=`<div class="org-member ${statusClass}" onclick="openOrgPerson('${escapeHtml(member.emp_no)}')">
         <div class="org-member-main">
-          <span class="org-member-name">${escapeHtml(member.name)} ${member.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</span>
+          <span class="org-member-name">${escapeHtml(member.name)} ${orgNameExtraBadge(member)} ${member.on_leave?`<span class="leave-badge">육아휴직</span>`:""}</span>
           <span class="org-member-position">${escapeHtml(member.position||"사원")}</span>
         </div>
         ${state.orgEditMode?`<button class="btn small" onclick="selectOrgPerson('${escapeHtml(member.emp_no)}')">수정</button>`:""}

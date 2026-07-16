@@ -1003,3 +1003,5 @@ body:not(.modal-open)>.modal-backdrop,
 body:not(.modal-open)>.loading-overlay,
 body:not(.modal-open)>.screen-lock,
 body:not(.modal-open)>.busy-layer{pointer-events:none!important}
+
+.transport-badge{display:inline-flex;align-items:center;padding:1px 6px;margin-left:4px;border-radius:999px;background:#e8f0ff;color:#1d4ed8;font-size:10px;font-weight:800;line-height:1.4;vertical-align:middle}
