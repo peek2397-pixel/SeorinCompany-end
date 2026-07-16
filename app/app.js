@@ -53,7 +53,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -708,8 +708,95 @@ async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();lo
 
 async function refreshAll(){
   await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupSharedOperationalRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
+
+function stopSharedSyncFallback(){
+  if(state.sharedSyncTimer){
+    clearInterval(state.sharedSyncTimer);
+    state.sharedSyncTimer=null;
+  }
+}
+
+async function refreshSharedOperationalData(){
+  if(!state.user)return;
+  try{
+    await Promise.all([
+      loadCalendarEntries(),
+      loadContractorWorkforce(),
+      loadCompanyEvents(),
+      loadMeetingBookings(),
+      loadBusinessTrips(),
+      loadCards(),
+      loadVehicles(),
+      loadVehicleTrips(),
+      loadVehicleMaintenance(),
+      loadVehicleInspections(),
+      loadForkliftAssets(),
+      loadForkliftMaintenance(),
+      loadEmployees(),
+      loadEmployeeRegistry(),
+      loadOrgTeams()
+    ]);
+    renderCalendar();
+    renderContractors();
+    renderCompanyEvents();
+    renderMeetings();
+    renderBusinessTrips();
+    renderCards();
+    renderDashboard();
+    renderTransport();
+    renderVehicles();
+    renderForklifts();
+    renderEmployees();
+    renderEmployeeRegistry();
+    renderOrg();
+    renderOrgManagement();
+  }catch(error){
+    console.warn("공통 운영자료 동기화 실패",error);
+  }
+}
+
+function startSharedSyncFallback(){
+  stopSharedSyncFallback();
+  state.sharedSyncTimer=setInterval(refreshSharedOperationalData,5000);
+}
+
+function setupSharedOperationalRealtime(){
+  if(!supabaseClient || !state.user || state.sharedRealtimeChannel)return;
+
+  const channel=supabaseClient.channel(`shared-ops-${state.user.id}-${Date.now()}`);
+  const handlers=[
+    ["contractor_workforce",async()=>{await loadContractorWorkforce();renderContractors();renderCalendar();renderDashboard();}],
+    ["work_calendar_entries",async()=>{await loadCalendarEntries();renderCalendar();renderDashboard();renderContractorSummary();}],
+    ["company_events",async()=>{await loadCompanyEvents();renderCompanyEvents();renderCalendar();renderDashboard();}],
+    ["meeting_bookings",async()=>{await loadMeetingBookings();renderMeetings();renderCalendar();renderDashboard();}],
+    ["business_trips",async()=>{await loadBusinessTrips();renderBusinessTrips();renderCalendar();renderDashboard();}],
+    ["corporate_card_expenses",async()=>{await loadCards();renderCards();renderDashboard();}],
+    ["vehicles",async()=>{await loadVehicles();renderTransport();renderVehicles();renderDashboard();}],
+    ["vehicle_trips",async()=>{await loadVehicleTrips();renderTransport();renderVehicles();}],
+    ["vehicle_maintenance",async()=>{await loadVehicleMaintenance();renderTransport();renderVehicles();}],
+    ["vehicle_inspections",async()=>{await loadVehicleInspections();renderTransport();renderVehicles();renderDashboard();}],
+    ["forklift_assets",async()=>{await loadForkliftAssets();renderForklifts();}],
+    ["forklift_maintenance",async()=>{await loadForkliftMaintenance();renderForklifts();}],
+    ["employee_registry",async()=>{await loadEmployeeRegistry();renderEmployeeRegistry();renderOrg();renderDinnerEmployeePicker();}],
+    ["profiles",async()=>{await loadEmployees();renderEmployees();renderOrg();renderDinnerEmployeePicker();renderDashboard();}],
+    ["org_teams",async()=>{await loadOrgTeams();renderOrg();renderOrgManagement();renderDinnerEmployeePicker();}]
+  ];
+
+  handlers.forEach(([table,handler])=>{
+    channel.on("postgres_changes",{event:"*",schema:"public",table},async payload=>{
+      console.log(`${table} realtime`,payload.eventType);
+      try{await handler(payload)}catch(error){console.warn(`${table} 실시간 반영 실패`,error)}
+    });
+  });
+
+  state.sharedRealtimeChannel=channel.subscribe(status=>{
+    console.log("shared realtime status",status);
+    if(status==="SUBSCRIBED")startSharedSyncFallback();
+  });
+}
+
 async function loadCards(){
   if(!has("card_use"))return;
   let q=supabaseClient.from("corporate_card_expenses").select("*").order("used_date",{ascending:false}).limit(500);
@@ -1980,7 +2067,10 @@ async function saveContractor(){
   }
 
   clearContractorForm();
+  await loadContractorWorkforce();
   renderContractors();
+  renderCalendar();
+  renderDashboard();
   toast(editingId?"외주 인력 내역을 수정했습니다.":"외주 인력을 등록했습니다.");
 
   const refreshRelated=()=>{
@@ -2013,7 +2103,10 @@ window.deleteContractor=async function(id){
 
   state.contractorWorkforce=(state.contractorWorkforce||[]).filter(x=>String(x.id)!==String(id));
   if(String(state.editingContractorId||"")===String(id)) clearContractorForm();
+  await loadContractorWorkforce();
   renderContractors();
+  renderCalendar();
+  renderDashboard();
   setTimeout(()=>$("contractorCompany")?.focus(),0);
   toast("외주 인력 내역을 삭제했습니다.");
 
