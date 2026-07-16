@@ -344,9 +344,14 @@ async function createDinnerRoom(){
   const roomId=typeof room==='string'?room:room?.id||room;
   if(!roomId){toast('회식방 ID를 받지 못했습니다.');return;}
   const memberRows=members.map(m=>({room_id:roomId,user_id:m.user_id,member_name:m.member_name}));
-  const memberUpsert=await supabaseClient.from('dinner_room_members').upsert(memberRows,{onConflict:'room_id,user_id'});
-  if(memberUpsert.error)console.warn('참여자 보강 저장 실패',memberUpsert.error);
-  const optimistic={id:roomId,title,dinner_date:dinnerDate,created_by:state.user.id,created_by_name:state.profile?.name||'관리자',created_at:new Date().toISOString(),member_count:members.length,_members:memberRows.map(x=>({...x,id:`local-${x.user_id}`,joined_at:new Date().toISOString()}))};
+  const memberUpsert=await supabaseClient.from('dinner_room_members').upsert(memberRows,{onConflict:'room_id,user_id'}).select('id,room_id,user_id,member_name,joined_at');
+  if(memberUpsert.error){
+    console.error('참여자 저장 실패',memberUpsert.error);
+    toast('회식방은 생성됐지만 참여자 저장에 실패했습니다: '+memberUpsert.error.message);
+    return;
+  }
+  const savedMembers=(memberUpsert.data&&memberUpsert.data.length)?memberUpsert.data:memberRows.map(x=>({...x,id:`local-${x.user_id}`,joined_at:new Date().toISOString()}));
+  const optimistic={id:roomId,title,dinner_date:dinnerDate,created_by:state.user.id,created_by_name:state.profile?.name||'관리자',created_at:new Date().toISOString(),member_count:savedMembers.length,_members:savedMembers};
   state.dinnerRooms=[optimistic,...(state.dinnerRooms||[]).filter(r=>String(r.id)!==String(roomId))];
   state.dinnerRoomMembers=optimistic._members||[];
   state.dinnerOnlineUserIds=new Set([String(state.user.id)]);
