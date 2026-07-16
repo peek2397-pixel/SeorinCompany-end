@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "새 버전 번호 (예: 1.16.3)"
+        description: "새 버전 번호 (예: 1.16.4)"
         required: true
-        default: "1.16.3"
+        default: "1.16.4"
 
 permissions:
   contents: write
@@ -17,21 +17,21 @@ jobs:
 
     steps:
       - name: Checkout project
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
-          package-manager-cache: false
 
       - name: Check project files
         shell: pwsh
         run: |
-          Get-ChildItem
           if (!(Test-Path "package.json")) {
-            throw "저장소 최상위에 package.json이 없습니다."
+            throw "package.json 파일이 없습니다."
           }
+
+          Get-Content package.json
 
       - name: Apply version
         shell: pwsh
@@ -41,20 +41,46 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build and publish GitHub Release
+      - name: Build Windows update files
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run build:win -- --publish always
+        run: npm run build:win -- --publish never
 
-      - name: Verify update files
+      - name: Verify generated files
         shell: pwsh
         run: |
           Get-ChildItem dist -Recurse
 
           if (!(Test-Path "dist/latest.yml")) {
-            throw "dist/latest.yml이 생성되지 않았습니다."
+            throw "latest.yml이 생성되지 않았습니다."
           }
+
+          $setup = Get-ChildItem "dist/*.exe" | Select-Object -First 1
+          if ($null -eq $setup) {
+            throw "Windows 설치파일이 생성되지 않았습니다."
+          }
+
+      - name: Delete same version release if it exists
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "v${{ inputs.version }}" --yes --cleanup-tag 2>$null
+          exit 0
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ inputs.version }}" `
+            "dist/latest.yml" `
+            "dist/*.exe" `
+            "dist/*.blockmap" `
+            --repo "${{ github.repository }}" `
+            --title "SeorinCompany v${{ inputs.version }}" `
+            --notes "서린컴퍼니 물류포털 자동 업데이트 버전 ${{ inputs.version }}" `
+            --latest
 
       - name: Upload build backup
         uses: actions/upload-artifact@v4
