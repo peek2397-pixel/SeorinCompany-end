@@ -53,7 +53,7 @@ const menus = [
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
 
 const $ = id => document.getElementById(id);
 
@@ -708,7 +708,7 @@ async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();lo
 
 async function refreshAll(){
   await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 async function loadCards(){
   if(!has("card_use"))return;
@@ -734,6 +734,125 @@ async function loadPurchaseRequests(){
   }
   state.purchaseRequests=data||[];
 }
+
+function stopPurchaseSyncFallback(){
+  if(state.purchaseSyncTimer){
+    clearInterval(state.purchaseSyncTimer);
+    state.purchaseSyncTimer=null;
+  }
+}
+function startPurchaseSyncFallback(){
+  stopPurchaseSyncFallback();
+  state.purchaseSyncTimer=setInterval(async()=>{
+    if(!state.user || !has("purchase_view"))return;
+    try{
+      await loadPurchaseRequests();
+      renderPurchases();
+      renderDashboard();
+      if(has("inventory_view")){
+        await loadItems();
+        renderInventory();
+      }
+    }catch(error){
+      console.warn("구매·물품 자동 동기화 재조회 실패",error);
+    }
+  },5000);
+}
+function setupPurchaseInventoryRealtime(){
+  if(!supabaseClient || !state.user)return;
+
+  if(!state.purchaseRealtimeChannel){
+    state.purchaseRealtimeChannel=supabaseClient
+      .channel(`purchase-live-${state.user.id}-${Date.now()}`)
+      .on("postgres_changes",{event:"*",schema:"public",table:"purchase_requests"},async(payload)=>{
+        console.log("purchase_requests realtime",payload.eventType);
+        await loadPurchaseRequests();
+        renderPurchases();
+        renderDashboard();
+        renderPendingWorkAlerts(true);
+      })
+      .subscribe(status=>{
+        console.log("purchase realtime status",status);
+        if(status==="SUBSCRIBED") startPurchaseSyncFallback();
+      });
+  }
+
+  if(!state.inventoryRealtimeChannel && has("inventory_view")){
+    state.inventoryRealtimeChannel=supabaseClient
+      .channel(`inventory-live-${state.user.id}-${Date.now()}`)
+      .on("postgres_changes",{event:"*",schema:"public",table:"inventory_items"},async()=>{
+        await loadItems();
+        renderInventory();
+        renderDashboard();
+      })
+      .on("postgres_changes",{event:"*",schema:"public",table:"inventory_transactions"},async()=>{
+        await loadItems();
+        renderInventory();
+        renderDashboard();
+      })
+      .subscribe(status=>console.log("inventory realtime status",status));
+  }
+
+  startPurchaseSyncFallback();
+}
+
+async function syncPurchaseToInventory(requestId){
+  if(!has("inventory_view") && !isPurchaseManager() && !isFinalPurchaseApprover())return null;
+  const request=(state.purchaseRequests||[]).find(x=>String(x.id)===String(requestId));
+  if(!request)return null;
+  if(request.inventory_item_id)return request.inventory_item_id;
+
+  const itemName=String(request.item_name||"").trim();
+  if(!itemName)return null;
+
+  let {data:existing,error:findError}=await supabaseClient
+    .from("inventory_items")
+    .select("id,name")
+    .ilike("name",itemName)
+    .limit(1)
+    .maybeSingle();
+
+  if(findError)console.warn("기존 물품 확인 실패",findError);
+
+  let itemId=existing?.id||null;
+  if(!itemId){
+    const quantity=Math.max(0,Number(request.quantity||0));
+    const estimated=Number(request.estimated_amount||0);
+    const row={
+      name:itemName,
+      category:"구매등록",
+      specification:String(request.memo||"").trim(),
+      unit:String(request.unit||"").trim(),
+      current_stock:0,
+      minimum_stock:0,
+      storage_location:"",
+      vendor:"",
+      unit_price:quantity>0&&estimated>0?Math.round(estimated/quantity):0,
+      created_by:state.user.id
+    };
+    const {data:newItem,error:insertError}=await supabaseClient
+      .from("inventory_items")
+      .insert(row)
+      .select("id")
+      .single();
+    if(insertError){
+      console.error("구매 승인 물품등록 실패",insertError);
+      toast("결재는 완료됐지만 물품관리 등록에 실패했습니다: "+insertError.message);
+      return null;
+    }
+    itemId=newItem?.id||null;
+  }
+
+  if(itemId){
+    const {error:updateError}=await supabaseClient
+      .from("purchase_requests")
+      .update({inventory_item_id:itemId})
+      .eq("id",requestId);
+    if(updateError)console.warn("구매신청-물품 연결 저장 실패",updateError);
+  }
+  return itemId;
+}
+
 async function loadNotices(){
   if(!has("notices_view"))return;
   const {data,error}=await supabaseClient.from("notices").select("*").order("created_at",{ascending:false}).limit(100);
@@ -2117,6 +2236,8 @@ async function savePurchase(){
   $("purchaseQuantity").value="1";$("purchaseUrgent").value="false";$("purchaseNeededDate").value="";
   toast("구매 신청이 등록되었습니다.");
   await loadPurchaseRequests();renderPurchases();renderDashboard();
+  setupPurchaseInventoryRealtime();
+  setTimeout(async()=>{await loadPurchaseRequests();renderPurchases();renderDashboard()},300);
 }
 function usageDayCount(x){
   if(!x.completed_at)return null;
@@ -2185,8 +2306,11 @@ async function finalCompletePurchase(id){
     p_reason:"최고관리자 직접 완료 처리"
   });
   if(error){toast(`완료 처리 실패: ${error.message}`);return}
-  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
-  toast("최고관리자가 검토 단계를 생략하고 구매완료 처리했습니다.");
+  await loadPurchaseRequests();
+  await syncPurchaseToInventory(id);
+  await loadItems();
+  renderPurchases();renderInventory();renderDashboard();renderPendingWorkAlerts();
+  toast("최고관리자가 구매완료 처리했고 물품관리에도 등록했습니다.");
 }
 
 function renderPurchases(){
@@ -2234,7 +2358,17 @@ window.changePurchaseStatus=async function(id,status){
   const {error}=await call;
   if(error){toast("상태 변경 실패: "+error.message);return}
   toast((direct?"검토 생략 · ":"")+label+" 처리되었습니다.");
-  await loadPurchaseRequests();renderPurchases();renderDashboard();renderPendingWorkAlerts();
+  await loadPurchaseRequests();
+  if(["approved","completed"].includes(status)){
+    await syncPurchaseToInventory(id);
+    await loadItems();
+    renderInventory();
+  }
+  renderPurchases();renderDashboard();renderPendingWorkAlerts();
+  if(status==="approved"){
+    goPage("inventory");
+    toast("결재 완료 후 물품관리로 이동했습니다.");
+  }
 };
 window.rejectPurchase=async function(id){
   const reason=await appPrompt("반려 사유를 입력하세요.",{title:"구매 반려",multiline:true,placeholder:"반려 사유"});
