@@ -1521,19 +1521,62 @@ function renderCalendar(){
     $("leaveSummaryTitle").textContent = `${employee?.name||"내"} 휴가 잔여 현황`;
   }
 
-  $("calendarHistory").innerHTML=table(
-    ["직원","시작일","종료일","구분","입력일수","환산/차감","메모"],
-    entries.slice().reverse().map(x=>[
-      x.profiles?.name||state.profile?.name||"",
-      x.start_date,
-      x.end_date,
-      calendarLabels[x.event_type]||x.event_type,
-      formatDays(x.days),
-      x.event_type==="weekend_work"?formatDays(Number(x.days)*1.5)+"일 적립":formatDays(x.days)+"일",
-      x.memo
-    ])
-  );
+  const historyRows=entries.slice().reverse();
+  $("calendarHistory").innerHTML=`<div class="table-wrap"><table><thead><tr>
+    ${["직원","시작일","종료일","구분","입력일수","환산/차감","메모","관리"].map(h=>`<th>${h}</th>`).join("")}
+  </tr></thead><tbody>${historyRows.length?historyRows.map(x=>{
+    const isMine=String(x.employee_id)===String(state.user?.id);
+    const canWithdraw=isMine||has("calendar_manage");
+    const action=canWithdraw
+      ? `<button type="button" class="danger small" onclick="withdrawCalendarEntry('${escapeHtml(x.id)}')">${isMine?"회수":"삭제"}</button>`
+      : "";
+    const converted=x.event_type==="weekend_work"
+      ? `${formatDays(Number(x.days)*1.5)}일 적립`
+      : `${formatDays(x.days)}일`;
+    return `<tr>
+      <td>${escapeHtml(x.profiles?.name||state.profile?.name||"")}</td>
+      <td>${escapeHtml(x.start_date||"")}</td>
+      <td>${escapeHtml(x.end_date||"")}</td>
+      <td>${escapeHtml(calendarLabels[x.event_type]||x.event_type||"")}</td>
+      <td>${escapeHtml(formatDays(x.days))}</td>
+      <td>${escapeHtml(converted)}</td>
+      <td class="left">${escapeHtml(x.memo||"")}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join(""):`<tr><td colspan="8">등록된 내역이 없습니다.</td></tr>`}</tbody></table></div>`;
 }
+
+window.withdrawCalendarEntry=async function(entryId){
+  const entry=state.calendarEntries.find(x=>String(x.id)===String(entryId));
+  if(!entry){toast("회수할 내역을 찾지 못했습니다.");return}
+
+  const isMine=String(entry.employee_id)===String(state.user?.id);
+  if(!isMine&&!has("calendar_manage")){
+    toast("본인이 등록한 일정만 회수할 수 있습니다.");
+    return;
+  }
+
+  const label=calendarLabels[entry.event_type]||"일정";
+  const message=isMine
+    ? `${entry.start_date} ${label} 내역을 회수할까요? 회수하면 달력과 사용내역에서 삭제되고 잔여 수량이 다시 반영됩니다.`
+    : `${entry.profiles?.name||"직원"}의 ${entry.start_date} ${label} 내역을 삭제할까요?`;
+  if(!(await appConfirm(message)))return;
+
+  let error=null;
+  const rpcResult=await supabaseClient.rpc("withdraw_work_calendar_entry",{p_entry_id:entryId});
+  if(rpcResult.error){
+    const fallback=await supabaseClient.from("work_calendar_entries").delete().eq("id",entryId);
+    error=fallback.error;
+  }
+  if(error){toast("회수 실패: "+error.message);return}
+
+  state.calendarEntries=state.calendarEntries.filter(x=>String(x.id)!==String(entryId));
+  await Promise.all([loadCalendarEntries(),loadLeaveAdjustments(),loadYearlyLeaveBalances()]);
+  renderCalendar();
+  renderDashboard();
+  toast(isMine?"내 일정을 회수했습니다.":"직원 일정을 삭제했습니다.");
+};
+
 async function saveCalendarEntry(){
   const type=$("calType").value;
   let days=Number($("calDays").value||1);
