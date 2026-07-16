@@ -1060,6 +1060,34 @@
         </div>
       </section>
 
+
+      <section id="directorSchedulePage" class="page">
+        <div class="content-grid director-schedule-layout">
+          <article class="panel">
+            <div class="panel-head"><div><h3>손동오 이사 일정 등록</h3><small>손동오 이사와 김헌정만 확인하고 관리할 수 있습니다.</small></div></div>
+            <div class="form-grid">
+              <label>날짜<input id="directorScheduleDate" type="date" /></label>
+              <label>중요도<select id="directorScheduleImportance"><option>일반</option><option>중요</option></select></label>
+              <label>시작 시간<input id="directorScheduleStart" type="time" value="09:00" /></label>
+              <label>종료 시간<input id="directorScheduleEnd" type="time" /></label>
+              <label class="span-2">일정 제목<input id="directorScheduleTitle" placeholder="예: 본사 운영회의" /></label>
+              <label class="span-2">장소<input id="directorScheduleLocation" placeholder="예: 본사 3층 회의실" /></label>
+              <label class="span-2">메모<textarea id="directorScheduleMemo" rows="4" placeholder="준비사항이나 전달 내용을 입력하세요."></textarea></label>
+              <label class="check-row span-2"><input id="directorScheduleCompleted" type="checkbox" /> 완료된 일정</label>
+            </div>
+            <div class="actions"><button id="clearDirectorScheduleBtn" class="btn">새로 입력</button><button id="saveDirectorScheduleBtn" class="btn primary">일정 저장</button></div>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-head"><div><h3 id="directorScheduleMonthLabel">월간 일정</h3><small>일정을 누르면 바로 수정할 수 있습니다.</small></div><div class="actions"><button id="directorSchedulePrevBtn" class="btn small">이전 달</button><button id="directorScheduleTodayBtn" class="btn small">오늘</button><button id="directorScheduleNextBtn" class="btn small">다음 달</button></div></div>
+            <div id="directorScheduleCalendar" class="director-calendar"></div>
+          </article>
+          <article class="panel span-3">
+            <div class="panel-head"><div><h3>예정 일정</h3><small>오늘 이후 일정을 시간순으로 표시합니다.</small></div></div>
+            <div id="directorScheduleList" class="director-schedule-list"></div>
+          </article>
+        </div>
+      </section>
+
       <section id="permissionsPage" class="page">
         <div class="panel">
           <div class="panel-head">

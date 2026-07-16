@@ -1,6 +1,6 @@
 {
   "project": "SeorinCompany Logistics Portal",
-  "version": "1.18.0",
+  "version": "1.23.0",
   "windows_installer": "NSIS",
   "desktop_shortcut": true,
   "start_menu_shortcut": true,
