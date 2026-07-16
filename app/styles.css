@@ -1069,3 +1069,21 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
   .director-form-grid{grid-template-columns:1fr}
   .director-form-grid .span-2{grid-column:auto}
 }
+
+/* V125 재고현황 클릭 사용 */
+.inventory-name-link{border:0;background:none;padding:0;color:#145ce6;font-weight:800;cursor:pointer;text-decoration:underline}
+.inventory-use-layer{position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.48);display:flex;align-items:center;justify-content:center;padding:20px}
+.inventory-use-card{width:min(760px,calc(100vw - 40px));max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:16px;padding:22px;box-shadow:0 28px 80px rgba(15,23,42,.3)}
+.inventory-use-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.inventory-use-head h2{margin:0 0 4px}
+.inventory-use-head small{color:#64748b}
+.inventory-use-close{border:0;background:#eef2f7;border-radius:9px;width:36px;height:36px;font-size:24px;cursor:pointer}
+.inventory-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.inventory-detail-grid>div{border:1px solid #d8e2ef;border-radius:10px;background:#f8fbff;padding:11px}
+.inventory-detail-grid span{display:block;color:#64748b;font-size:12px;margin-bottom:4px}
+.inventory-use-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.inventory-use-form label{display:flex;flex-direction:column;gap:6px;font-weight:700}
+.inventory-use-form input,.inventory-use-form textarea{border:1px solid #cbd7e7;border-radius:9px;padding:11px;font:inherit}
+.inventory-use-form .span-2{grid-column:1/-1}
+.inventory-use-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+@media(max-width:700px){.inventory-detail-grid,.inventory-use-form{grid-template-columns:1fr}.inventory-use-form .span-2{grid-column:auto}}

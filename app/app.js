@@ -2595,53 +2595,163 @@ async function saveTx(){
   toast("재고를 반영했습니다.");await loadItems();renderInventory();renderDashboard();
 }
 function renderInventory(){
-  $("txItem").innerHTML=state.items.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} (${x.current_stock}${x.unit||""})</option>`).join("");
   const admin=isRecordAdmin();
   const canReceive=isPurchaseManager()||isFinalPurchaseApprover()||admin;
-  const heads=["품목명","분류","규격","단위","현재재고","최소재고","상태","보관위치","거래처","단가",...((admin||canReceive)?["관리"]:[])];
+  const heads=["품목명","신청자","분류","규격","단위","현재재고","최소재고","상태","보관위치","거래처","단가","관리"];
 
   const rows=state.items.map(x=>{
     const linked=(state.purchaseRequests||[])
       .filter(p=>String(p.inventory_item_id||"")===String(x.id))
       .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
 
+    const latestRequest=linked[0];
+    const requester=latestRequest?.requester_name||latestRequest?.requester_emp_no||"-";
     const pending=linked.filter(p=>["approved","ordered","received"].includes(p.status)&&!p.received_at);
     const recentReceived=linked.find(p=>p.received_at);
 
-    const controls=[];
+    const controls=[
+      `<button class="btn small primary" onclick="openInventoryItemDetail('${x.id}')">상세·사용</button>`
+    ];
+
     if(canReceive){
       pending.forEach(p=>{
-        controls.push(`<button class="btn small success" onclick="confirmInventoryReceipt('${p.id}')">입고 확인 ${Number(p.quantity||0).toLocaleString("ko-KR")}${escapeHtml(p.unit||"")}</button>`);
+        controls.push(`<button class="btn small success" onclick="event.stopPropagation();confirmInventoryReceipt('${p.id}')">입고 확인 ${Number(p.quantity||0).toLocaleString("ko-KR")}${escapeHtml(p.unit||"")}</button>`);
       });
       if(recentReceived){
         controls.push(`<small class="receipt-confirmed">입고완료 ${escapeHtml(String(recentReceived.received_quantity??recentReceived.quantity??""))}${escapeHtml(recentReceived.unit||"")}<br>${formatDateTime(recentReceived.received_at)}</small>`);
       }
     }
-    if(admin){
-      const hasLinkedPurchase=linked.length>0;
-      const hasStock=Number(x.current_stock||0)!==0;
-      const hasHistory=state.inventoryHistoryItemIds?.has(String(x.id));
-      const blockers=[];
-      if(hasLinkedPurchase)blockers.push("구매신청 연결");
-      if(hasStock)blockers.push("재고 있음");
-      if(hasHistory)blockers.push("입출고 이력");
 
-      if(blockers.length){
-        controls.push(`<span class="inventory-in-use" title="${escapeHtml(blockers.join(", "))}">사용중 · ${escapeHtml(blockers.join(" / "))}</span>`);
-      }else{
-        controls.push(`<button class="btn small danger" onclick="deleteInventoryItem('${x.id}')">삭제</button>`);
-      }
+    if(admin){
+      controls.push(`<button class="btn small danger" onclick="event.stopPropagation();forceDeleteInventoryItem('${x.id}')">삭제</button>`);
     }
 
     return [
-      x.name,x.category,x.specification,x.unit,x.current_stock,x.minimum_stock,
+      `<button class="inventory-name-link" onclick="openInventoryItemDetail('${x.id}')">${escapeHtml(x.name||"")}</button>`,
+      escapeHtml(requester),
+      x.category,x.specification,x.unit,x.current_stock,x.minimum_stock,
       Number(x.current_stock)<=Number(x.minimum_stock)?"부족":"정상",
       x.storage_location,x.vendor,money(x.unit_price),
-      ...((admin||canReceive)?[`<div class="inline-actions inventory-actions">${controls.join(" ")||"-"}</div>`]:[])
+      `<div class="inline-actions inventory-actions">${controls.join(" ")}</div>`
     ];
   });
   $("inventoryTable").innerHTML=tableHtml(heads,rows);
 }
+
+function openInventoryUseModal(item){
+  return new Promise(resolve=>{
+    document.getElementById("inventoryUseLayer")?.remove();
+    const layer=document.createElement("div");
+    layer.id="inventoryUseLayer";
+    layer.className="inventory-use-layer";
+
+    const linked=(state.purchaseRequests||[])
+      .filter(p=>String(p.inventory_item_id||"")===String(item.id))
+      .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+    const latest=linked[0];
+
+    layer.innerHTML=`
+      <div class="inventory-use-card">
+        <div class="inventory-use-head">
+          <div>
+            <h2>${escapeHtml(item.name||"물품")}</h2>
+            <small>재고 확인 및 사용 차감</small>
+          </div>
+          <button class="inventory-use-close" type="button">×</button>
+        </div>
+
+        <div class="inventory-detail-grid">
+          <div><span>신청자</span><b>${escapeHtml(latest?.requester_name||latest?.requester_emp_no||"-")}</b></div>
+          <div><span>현재재고</span><b>${Number(item.current_stock||0).toLocaleString("ko-KR")}${escapeHtml(item.unit||"")}</b></div>
+          <div><span>분류</span><b>${escapeHtml(item.category||"-")}</b></div>
+          <div><span>규격</span><b>${escapeHtml(item.specification||"-")}</b></div>
+          <div><span>보관위치</span><b>${escapeHtml(item.storage_location||"-")}</b></div>
+          <div><span>거래처</span><b>${escapeHtml(item.vendor||"-")}</b></div>
+        </div>
+
+        <div class="inventory-use-form">
+          <label>사용 수량
+            <input id="inventoryUseQty" type="number" min="0.01" step="0.01" placeholder="차감할 수량" />
+          </label>
+          <label>사용자/담당자
+            <input id="inventoryUsePerson" value="${escapeHtml(state.profile?.name||"")}" placeholder="사용자 이름" />
+          </label>
+          <label class="span-2">사용 메모
+            <textarea id="inventoryUseMemo" rows="4" placeholder="사용 목적이나 부서를 입력하세요."></textarea>
+          </label>
+        </div>
+
+        <div class="inventory-use-actions">
+          <button class="btn" id="inventoryUseCancelBtn" type="button">취소</button>
+          <button class="btn primary" id="inventoryUseConfirmBtn" type="button">재고 차감</button>
+        </div>
+      </div>
+    `;
+    document.body.append(layer);
+    document.body.classList.add("modal-open");
+
+    let done=false;
+    const finish=value=>{
+      if(done)return;
+      done=true;
+      layer.remove();
+      document.body.classList.remove("modal-open");
+      restorePortalInteraction();
+      resolve(value);
+    };
+
+    layer.querySelector(".inventory-use-close")?.addEventListener("click",()=>finish(null));
+    $("inventoryUseCancelBtn")?.addEventListener("click",()=>finish(null));
+    $("inventoryUseConfirmBtn")?.addEventListener("click",()=>{
+      const qty=Number($("inventoryUseQty")?.value||0);
+      const person=$("inventoryUsePerson")?.value.trim();
+      const memo=$("inventoryUseMemo")?.value.trim();
+      if(!Number.isFinite(qty)||qty<=0){toast("사용 수량을 입력하세요.");return}
+      if(qty>Number(item.current_stock||0)){toast("현재재고보다 많이 사용할 수 없습니다.");return}
+      if(!person){toast("사용자 또는 담당자를 입력하세요.");return}
+      finish({qty,person,memo});
+    });
+    layer.addEventListener("mousedown",e=>{if(e.target===layer)finish(null);});
+    setTimeout(()=>$("inventoryUseQty")?.focus(),0);
+  });
+}
+
+window.openInventoryItemDetail=async function(id){
+  const item=(state.items||[]).find(x=>String(x.id)===String(id));
+  if(!item){toast("품목을 찾을 수 없습니다.");return}
+  const result=await openInventoryUseModal(item);
+  if(!result)return;
+
+  const {data,error}=await supabaseClient.rpc("use_inventory_item_direct",{
+    p_item_id:String(id),
+    p_quantity:result.qty,
+    p_person_name:result.person,
+    p_memo:result.memo||null
+  });
+  if(error){toast("재고 차감 실패: "+error.message);return}
+
+  await loadItems();
+  renderInventory();
+  renderDashboard();
+  toast(`${item.name} ${result.qty.toLocaleString("ko-KR")}${item.unit||""} 사용 처리했습니다. 남은 재고 ${Number(data?.new_stock||0).toLocaleString("ko-KR")}${item.unit||""}`);
+};
+
+window.forceDeleteInventoryItem=async function(id){
+  if(!isRecordAdmin()){toast("관리자만 삭제할 수 있습니다.");return}
+  const item=(state.items||[]).find(x=>String(x.id)===String(id));
+  if(!(await appConfirm(`${item?.name||"이 품목"}을 테스트 삭제할까요?\n연결된 구매신청은 유지하되 물품 연결을 해제하고, 입출고 기록은 삭제됩니다.`,{title:"물품 테스트 삭제"})))return;
+
+  const {data,error}=await supabaseClient.rpc("admin_force_delete_inventory_item_test",{
+    p_item_id:String(id)
+  });
+  if(error){toast("품목 삭제 실패: "+error.message);return}
+
+  await Promise.all([loadItems(),loadPurchaseRequests()]);
+  renderInventory();
+  renderPurchases();
+  renderDashboard();
+  toast(data?.message||"품목을 삭제했습니다.");
+};
 
 window.confirmInventoryReceipt=async function(requestId){
   if(!(isPurchaseManager()||isFinalPurchaseApprover()||isRecordAdmin())){
@@ -4123,7 +4233,7 @@ $("cardReceiptFile").onchange=e=>{
   $("receiptPreviewWrap").classList.remove("hidden");
   $("cardReceipt").value="첨부";
 };
-$("saveItemBtn").onclick=saveItem;$("saveTxBtn").onclick=saveTx;$("exportInventoryBtn").onclick=exportInventory;
+$("saveItemBtn")&&($("saveItemBtn").onclick=saveItem);$("saveTxBtn")&&($("saveTxBtn").onclick=saveTx);$("exportInventoryBtn")&&($("exportInventoryBtn").onclick=exportInventory);
 $("savePurchaseBtn").onclick=savePurchase;$("purchaseStatusFilter").onchange=renderPurchases;$("refreshPurchaseBtn").onclick=async()=>{await loadPurchaseRequests();renderPurchases();toast("구매 내역을 새로고침했습니다.")};
 $("sendPrivateBtn").onclick=sendPrivate;
 $("savePermissionBtn").onclick=savePermissions;$("selectAllPermissionUsersBtn").onclick=selectAllPermissionUsers;$("clearPermissionUsersBtn").onclick=clearPermissionUsers;$("exportAllDataBtn").onclick=exportAllCompanyData;

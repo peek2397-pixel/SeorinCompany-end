@@ -363,36 +363,14 @@
           <button class="btn" onclick="goPage('purchase')">구매관리</button>
           <button class="btn primary">물품관리</button>
         </div>
-        <div class="content-grid">
-          <article class="panel">
-            <div class="panel-head"><h3>물류 물품 등록</h3></div>
-            <div class="form-grid">
-              <label>품목명<input id="itemName" placeholder="예: 요소수" /></label>
-              <label>분류<input id="itemCategory" placeholder="예: 차량용품" /></label>
-              <label>규격<input id="itemSpec" placeholder="예: 10L" /></label>
-              <label>단위<input id="itemUnit" placeholder="예: 통" /></label>
-              <label>현재재고<input id="itemStock" type="number" min="0" /></label>
-              <label>최소재고<input id="itemMinStock" type="number" min="0" /></label>
-              <label>보관위치<input id="itemLocation" /></label>
-              <label>거래처<input id="itemVendor" /></label>
-              <label>단가<input id="itemPrice" type="number" min="0" /></label>
+        <div class="panel inventory-status-panel">
+          <div class="panel-head">
+            <div>
+              <h3>물품 재고 현황</h3>
+              <small>품목 행이나 ‘상세·사용’ 버튼을 눌러 제품을 확인하고 재고를 차감하세요.</small>
             </div>
-            <button id="saveItemBtn" class="btn primary">품목 저장</button>
-          </article>
-          <article class="panel">
-            <div class="panel-head"><h3>입고·사용 등록</h3></div>
-            <div class="form-grid">
-              <label>품목<select id="txItem"></select></label>
-              <label>구분<select id="txType"><option value="in">입고</option><option value="out">사용</option><option value="discard">폐기</option><option value="adjust">조정</option></select></label>
-              <label>수량<input id="txQty" type="number" min="0" /></label>
-              <label>사용자/담당자<input id="txPerson" /></label>
-              <label class="span-2">메모<input id="txMemo" /></label>
-            </div>
-            <button id="saveTxBtn" class="btn primary">재고 반영</button>
-          </article>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3>물품 재고 현황</h3><button id="exportInventoryBtn" class="btn">엑셀 다운로드</button></div>
+            <button id="exportInventoryBtn" class="btn">엑셀 다운로드</button>
+          </div>
           <div id="inventoryTable"></div>
         </div>
       </section>
