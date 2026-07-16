@@ -24,6 +24,12 @@ contextBridge.exposeInMainWorld("seorinDesktop", {
   showNotification(payload) {
     ipcRenderer.send("seorin-show-desktop-notification", payload || {});
   },
+  setTaskbarAttention(active = true) {
+    ipcRenderer.send("seorin-set-taskbar-attention", Boolean(active));
+  },
+  clearTaskbarAttention() {
+    return ipcRenderer.invoke("seorin-clear-taskbar-attention");
+  },
   onNotificationClick(callback) {
     if (typeof callback !== "function") return () => {};
     const handler = (_event, payload) => callback(payload || {});

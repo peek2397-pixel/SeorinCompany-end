@@ -527,6 +527,9 @@ function updateMenuBadges(){
   });
 }
 function goPage(id){
+  if(["community","private","dinner","notices","purchase","inventory","events","meetings","trips","vehicles","transport"].includes(id)){
+    window.seorinDesktop?.clearTaskbarAttention?.();
+  }
   if(id==="transport"){state.vehicleViewGroup="transport";id="vehicles";}
   if(id==="purchase"&&!has("purchase_view")&&has("inventory_view"))id="inventory";
   if(id==="inventory"&&!has("inventory_view")&&has("purchase_view"))id="purchase";
@@ -816,6 +819,7 @@ function notificationTargetPage(type,page){
   return map[String(type||"").toLowerCase()]||"dashboard";
 }
 async function openUnifiedNotification(payload={}){
+  window.seorinDesktop?.clearTaskbarAttention?.();
   const page=notificationTargetPage(payload.notification_type||payload.type,payload.target_page||payload.page);
   try{window.focus()}catch(_){ }
   goPage(page);
@@ -838,6 +842,7 @@ async function openUnifiedNotification(payload={}){
 }
 function showUnifiedWindowsNotification(row){
   if(!row)return;
+  window.seorinDesktop?.setTaskbarAttention?.(true);
   const payload={
     id:String(row.id||""),
     title:`서린컴퍼니 · ${row.title||"새 알림"}`,
@@ -1496,7 +1501,7 @@ function renderCalendar(){
             <span>${formatDays(x.days)}일</span>
           </div>`;
         }).join("")}
-        ${has("calendar_manage")&&contractorDay.headcount?`<div class="calendar-event contractor-event"><b>외주 ${contractorDay.headcount}명</b> · 식사 ${contractorDay.meals}명</div>`:""}
+        ${contractorDay.rows?.length?contractorDay.rows.map(c=>`<div class="calendar-event contractor-event" title="${escapeHtml(c.memo||"")}"><b>외주 · ${escapeHtml(c.company_name||"업체")}</b>${c.work_area?` · ${escapeHtml(c.work_area)}`:""}<span>출근 ${Number(c.headcount||0)}명 · 식사 ${Number(c.meal_count||0)}명</span></div>`).join(""):""}
         ${(state.companyEvents||[]).filter(e=>date>=e.start_date&&date<=e.end_date).map(e=>`<div class="calendar-event company-event"><b>${eventTypeLabel(e.event_type)}</b> · ${escapeHtml(e.title)}</div>`).join("")}
         ${(state.meetingBookings||[]).filter(m=>m.meeting_date===date).map(m=>`<div class="calendar-event meeting-event"><b>${String(m.start_time).slice(0,5)} 회의</b> · ${escapeHtml(m.title)}</div>`).join("")}
       </div>
@@ -1808,10 +1813,31 @@ function renderContractors(){
       `${x.headcount||0}명`,
       `${x.meal_count||0}명`,
       x.memo||"",
-      `<div class="table-actions"><button class="btn small" onclick="editContractor('${x.id}')">수정</button><button class="btn small danger" onclick="deleteContractor('${x.id}')">삭제</button></div>`
+      `<div class="table-actions"><button class="btn small" onclick="editContractor('${x.id}')">수정</button><button class="btn small danger" onclick="deleteContractor('${x.id}')">회수</button></div>`
     ])
   );
   renderContractorSummary();
+}
+
+async function refreshContractorRelatedScreens(focusDate){
+  // 저장 직후 서버의 최신 값을 다시 읽어 사용자가 기다리거나 새로고침할 필요가 없게 한다.
+  await Promise.all([
+    loadContractorWorkforce(),
+    loadCalendarEntries(),
+    loadEmployees()
+  ]);
+
+  if(focusDate){
+    const parts=String(focusDate).split("-").map(Number);
+    if(parts.length>=2&&parts[0]&&parts[1]){
+      state.calendarDate=new Date(parts[0],parts[1]-1,1);
+    }
+    if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(focusDate).slice(0,7);
+  }
+
+  renderContractors();
+  renderCalendar();
+  renderDashboard();
 }
 
 async function saveContractor(){
@@ -1834,32 +1860,30 @@ async function saveContractor(){
   }
 
   const editingId=state.editingContractorId;
-  let result;
-  if(editingId){
-    result=await supabaseClient.from("contractor_workforce").update(row).eq("id",editingId).select().single();
-  }else{
-    result=await supabaseClient.from("contractor_workforce").insert(row).select().single();
+  const saveBtn=$("saveContractorBtn");
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="저장 중...";}
+
+  try{
+    let result;
+    if(editingId){
+      result=await supabaseClient.from("contractor_workforce").update(row).eq("id",editingId).select().single();
+    }else{
+      result=await supabaseClient.from("contractor_workforce").insert(row).select().single();
+    }
+    if(result.error){toast("외주 인력 저장 실패: "+result.error.message);return}
+
+    // 저장 완료 후 DB를 즉시 재조회하여 목록·달력·대시보드의 시간차를 없앤다.
+    await refreshContractorRelatedScreens(row.work_date);
+    clearContractorForm();
+    // clearContractorForm이 날짜를 오늘로 바꾸므로 저장한 달의 목록과 달력은 다시 유지한다.
+    if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(row.work_date).slice(0,7);
+    renderContractors();
+    renderCalendar();
+    renderDashboard();
+    toast(editingId?"외주 인력 내역을 수정하고 화면을 자동 갱신했습니다.":"외주 인력을 등록하고 달력·인원 합계를 자동 갱신했습니다.");
+  }finally{
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent="외주 인력 저장";}
   }
-  if(result.error){toast("외주 인력 저장 실패: "+result.error.message);return}
-
-  if(editingId){
-    const index=state.contractorWorkforce.findIndex(x=>String(x.id)===String(editingId));
-    if(index>=0) state.contractorWorkforce[index]=result.data;
-    else state.contractorWorkforce.unshift(result.data);
-  }else if(result.data){
-    state.contractorWorkforce.unshift(result.data);
-  }
-
-  clearContractorForm();
-  renderContractors();
-  toast(editingId?"외주 인력 내역을 수정했습니다.":"외주 인력을 등록했습니다.");
-
-  const refreshRelated=()=>{
-    try{ renderCalendar(); }catch(error){ console.warn("달력 지연 갱신 실패",error); }
-    try{ renderDashboard(); }catch(error){ console.warn("대시보드 지연 갱신 실패",error); }
-  };
-  if("requestIdleCallback" in window) requestIdleCallback(refreshRelated,{timeout:1500});
-  else setTimeout(refreshRelated,50);
 }
 
 window.editContractor=function(id){
@@ -1878,22 +1902,22 @@ window.editContractor=function(id){
 };
 
 window.deleteContractor=async function(id){
-  if(!(await appConfirm("이 외주 인력 내역을 삭제할까요?")))return;
+  if(!(await appConfirm("이 외주 인력을 회수할까요? 회수하면 근무·휴무 달력과 출근·식사 합계가 등록 전 상태로 돌아갑니다.")))return;
+  const target=(state.contractorWorkforce||[]).find(x=>String(x.id)===String(id));
+  const targetDate=target?.work_date||selectedContractorDate();
   const {error}=await supabaseClient.from("contractor_workforce").delete().eq("id",id);
-  if(error){toast("삭제 실패: "+error.message);return}
+  if(error){toast("회수 실패: "+error.message);return}
 
-  state.contractorWorkforce=(state.contractorWorkforce||[]).filter(x=>String(x.id)!==String(id));
-  if(String(state.editingContractorId||"")===String(id)) clearContractorForm();
+  if(String(state.editingContractorId||"")===String(id)) state.editingContractorId=null;
+  // 회수 완료 후에도 서버 최신 값을 즉시 재조회해 달력과 합계를 바로 원상복구한다.
+  await refreshContractorRelatedScreens(targetDate);
+  clearContractorForm();
+  if($("contractorMonthFilter")) $("contractorMonthFilter").value=String(targetDate).slice(0,7);
   renderContractors();
+  renderCalendar();
+  renderDashboard();
   setTimeout(()=>$("contractorCompany")?.focus(),0);
-  toast("외주 인력 내역을 삭제했습니다.");
-
-  const refreshRelated=()=>{
-    try{ renderCalendar(); }catch(error){ console.warn("달력 지연 갱신 실패",error); }
-    try{ renderDashboard(); }catch(error){ console.warn("대시보드 지연 갱신 실패",error); }
-  };
-  if("requestIdleCallback" in window) requestIdleCallback(refreshRelated,{timeout:1500});
-  else setTimeout(refreshRelated,50);
+  toast("외주 인력을 회수하고 달력·출근·식사 합계를 즉시 원상복구했습니다.");
 };
 
 function getDashboardPurchaseItems(){

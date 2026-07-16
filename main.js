@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, session, dialog, ipcMain, Notification } = require("electron");
+const { app, BrowserWindow, shell, session, dialog, ipcMain, Notification, nativeImage } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 
@@ -7,6 +7,25 @@ let updateCheckTimer;
 let updateDownloaded = false;
 let updateBusy = false;
 let availableVersion = null;
+let taskbarAttentionActive = false;
+
+function createRedAttentionIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="13" fill="#ef233c" stroke="#ffffff" stroke-width="4"/>
+  </svg>`;
+  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`).resize({ width: 16, height: 16 });
+}
+
+function setTaskbarAttention(active = true) {
+  taskbarAttentionActive = Boolean(active);
+  if (!mainWindow || mainWindow.isDestroyed() || process.platform !== "win32") return;
+  try {
+    mainWindow.setOverlayIcon(taskbarAttentionActive ? createRedAttentionIcon() : null, taskbarAttentionActive ? "새 대화 또는 변경 알림" : "");
+    mainWindow.flashFrame(taskbarAttentionActive);
+  } catch (error) {
+    console.error("작업표시줄 알림 표시 실패:", error);
+  }
+}
 
 function restoreAndFocusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -16,6 +35,7 @@ function restoreAndFocusMainWindow() {
 }
 
 ipcMain.on("seorin-show-desktop-notification", (_event, payload = {}) => {
+  setTaskbarAttention(true);
   try {
     if (!Notification.isSupported()) return;
     const notification = new Notification({
@@ -26,6 +46,7 @@ ipcMain.on("seorin-show-desktop-notification", (_event, payload = {}) => {
       urgency: "normal"
     });
     notification.on("click", () => {
+      setTaskbarAttention(false);
       restoreAndFocusMainWindow();
       mainWindow.webContents.send("seorin-desktop-notification-click", payload);
     });
@@ -35,6 +56,15 @@ ipcMain.on("seorin-show-desktop-notification", (_event, payload = {}) => {
   }
 });
 
+
+ipcMain.on("seorin-set-taskbar-attention", (_event, active = true) => {
+  setTaskbarAttention(active);
+});
+
+ipcMain.handle("seorin-clear-taskbar-attention", () => {
+  setTaskbarAttention(false);
+  return { ok: true };
+});
 
 function sendUpdateStatus(status, detail = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -115,6 +145,10 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     mainWindow.maximize();
     mainWindow.show();
+  });
+
+  mainWindow.on("focus", () => {
+    if (taskbarAttentionActive) setTaskbarAttention(false);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
