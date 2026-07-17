@@ -28,6 +28,8 @@ const pageInfo = {
   meetings:["회의실 예약","회의실 일정과 미팅 정보를 예약하고 확인합니다."],
   trips:["출장관리","출장 등록과 차량 지정, 출장자 식사 제외를 관리합니다."],
   transport:["차량·장비관리","일반 차량, 운송팀 차량, 지게차를 한 화면에서 선택해 관리합니다."],
+  freight:["운송비 관리","카카오톡 운송지시를 분석하고 운임·대기료·검수비를 관리합니다."],
+  integratedReport:["통합보고서","손동오 이사 전용 물류본부 통합 경영보고서입니다."],
   vehicles:["일반 차량관리","회사 차량의 운행일지와 정비 이력을 관리합니다."],
   forklift:["지게차관리","종합물류와 3물류의 전동·디젤 지게차를 관리합니다."],
   dinner:["회식·게임","회식방을 만들고 참여 직원과 메뉴 선택·게임을 진행합니다."],
@@ -50,12 +52,14 @@ const menus = [
   ["contractors","외주 업체 인력관리","contractors_view"],
   ["trips","출장관리","calendar_use"],
   ["transport","차량·장비관리","vehicles_view"],
+  ["freight","운송비 관리","__freight__"],
+  ["integratedReport","통합보고서","__owner_report__"],
   ["dinner","회식·게임","community_view"],
   ["account","내 정보·비밀번호","account_view"],
   ["employees","직원관리","employees_manage"],
   ["permissions","권한관리","permissions_manage"]
 ];
-let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], directorSchedules:[], directorScheduleDate:new Date(), leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, inventoryHistoryItemIds:new Set(), sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false };
+let state = { user:null, profile:null, permissions:{}, cards:[], items:[], notices:[], employees:[], employeeRegistry:[], orgTeams:[], privateMessages:[], privateReplies:[], selectedPrivateMessageId:null, chatMessages:[], messengerRooms:[], messengerMembers:[], selectedMessengerRoom:"global", calendarEntries:[], directorSchedules:[], directorScheduleDate:new Date(), leaveAdjustments:[], yearlyLeaveBalances:[], purchaseRequests:[], contractorWorkforce:[], editingContractorId:null, companyEvents:[], meetingBookings:[], businessTrips:[], vehicles:[], vehicleTrips:[], vehicleMaintenance:[], vehicleInspections:[], forkliftAssets:[], forkliftMaintenance:[], selectedVehicleId:null, editingVehicleId:null, editingTripId:null, editingMaintenanceId:null, editingForkliftId:null, editingForkliftMaintenanceId:null, workAlertChannel:null, purchaseRealtimeChannel:null, inventoryRealtimeChannel:null, purchaseSyncTimer:null, inventoryHistoryItemIds:new Set(), sharedRealtimeChannel:null, sharedSyncTimer:null, appNotificationChannel:null, appNotificationClickBound:false, privateNotificationChannel:null, dinnerMessageNotificationChannel:null, selectedPermissionUser:null, selectedPermissionUsers:[], chatChannel:null, noticeChannel:null, nativeNoticeNotifications:{}, calendarDate:new Date(), orgEditMode:false, tripEmployeeNames:[], vehicleViewGroup:"company", dinnerRooms:[], dinnerRoomMembers:[], dinnerMenuOptions:[], dinnerMenuVotes:[], selectedDinnerRoomId:null, selectedDinnerEmployeeIds:[], dinnerRoomMessages:[], unlockedDinnerRoomIds:new Set(), dinnerAlertChannel:null, dinnerChatChannel:null, dinnerPresenceChannel:null, dinnerOnlineUserIds:new Set(), dinnerSelectedDepartment:"", assetAdminSectionOpen:false, freightOrders:[], freightDrafts:[] };
 
 const $ = id => document.getElementById(id);
 
@@ -225,6 +229,8 @@ function toggle(id){$(id).classList.toggle("hidden")}
 function money(v){return Number(v||0).toLocaleString("ko-KR")+"원"}
 function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function has(key){return !!(state.profile?.is_super_admin || state.permissions?.[key])}
+function isPortalOwner(){return String(state.profile?.name||"").trim()==="손동오" || String(state.profile?.emp_no||"").toUpperCase()==="EMP001" || String(state.profile?.emp_no||"")==="201911041"}
+function canManageFreight(){return isPortalOwner() || has("vehicles_manage") || has("vehicles_view")}
 
 function fastRemoveFromState(key,id,renderFn){
   if(Array.isArray(state[key]))state[key]=state[key].filter(x=>String(x.id)!==String(id));
@@ -566,6 +572,8 @@ function renderMenu(){
   const rows=menus.filter(m=>{
     if(m[0]==="purchase")return has("purchase_view")||has("inventory_view");
     if(m[0]==="directorSchedule")return isScheduleAdmin();
+    if(m[0]==="freight")return canManageFreight();
+    if(m[0]==="integratedReport")return isPortalOwner();
     return has(m[2]);
   });
   $("menu").innerHTML=rows.map(([id,label])=>{
@@ -583,6 +591,8 @@ function updateMenuBadges(){
   });
 }
 function goPage(id){
+  if(id==="integratedReport"&&!isPortalOwner()){toast("통합보고서는 손동오 이사 계정에서만 볼 수 있습니다.");id="dashboard";}
+  if(id==="freight"&&!canManageFreight()){toast("운송비 관리 권한이 없습니다.");id="dashboard";}
   if(id==="directorSchedule"&&!isScheduleAdmin()){
     toast("이사 스케줄은 김헌정·손동오만 사용할 수 있습니다.");
     id="calendar";
@@ -596,6 +606,8 @@ function goPage(id){
   $("pageTitle").textContent=pageInfo[id]?.[0]||id; $("pageSub").textContent=pageInfo[id]?.[1]||"";
   if(id==="permissions") renderPermissions();
   if(id==="directorSchedule") renderDirectorSchedule();
+  if(id==="freight") renderFreight();
+  if(id==="integratedReport") renderIntegratedReport();
 }
 
 function openSignup(){$("signupForm").classList.remove("hidden");$("signupMsg").textContent="";}
@@ -715,8 +727,8 @@ async function loadProfile(){
 async function logout(){if(supabaseClient)await supabaseClient.auth.signOut();location.reload()}
 
 async function refreshAll(){
-  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadDirectorSchedules(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms()]);
-  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupSharedOperationalRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); setupDinnerRoomRealtime(); renderMyProfile();
+  await Promise.all([loadCards(),loadItems(),loadNotices(),loadEmployees(),loadEmployeeRegistry(),loadDinnerDirectory(),loadOrgTeams(),loadPrivateMessages(),loadMessengerRooms(),loadChatMessages(),loadCalendarEntries(),loadDirectorSchedules(),loadContractorWorkforce(),loadCompanyEvents(),loadMeetingBookings(),loadBusinessTrips(),loadVehicles(),loadVehicleTrips(),loadVehicleMaintenance(),loadVehicleInspections(),loadForkliftAssets(),loadForkliftMaintenance(),loadLeaveAdjustments(),loadYearlyLeaveBalances(),loadPurchaseRequests(),loadDinnerRooms(),loadFreightOrders()]);
+  renderDashboard(); renderCards(); renderInventory(); renderNotices(); renderEmployees(); renderEmployeeRegistry(); renderOrg(); renderOrgManagement(); renderPrivate(); renderMessengerRooms(); renderChat(); setupChatRealtime(); setupNoticeRealtime(); setupWorkAlertRealtime(); setupPurchaseInventoryRealtime(); setupSharedOperationalRealtime(); setupUnifiedAppNotifications(); setupPrivateMessageNotifications(); setupDinnerMessageNotifications(); renderPendingNoticeAlerts(); renderPendingWorkAlerts(); renderCalendar(); renderContractors(); renderCompanyEvents(); renderMeetings(); renderBusinessTrips(); renderTransport(); renderVehicles(); renderForklifts(); renderPurchases(); renderDinnerEmployeePicker(); renderDinnerSelectedEmployees(); renderDinnerRooms(); renderFreight(); renderIntegratedReport(); setupDinnerRoomRealtime(); renderMyProfile();
 }
 
 function stopSharedSyncFallback(){
@@ -2838,6 +2850,82 @@ const PURCHASE_STATUS={
 };
 function purchaseStatusLabel(v){return PURCHASE_STATUS[v]||v||"-"}
 
+
+function freightNum(v){const n=Number(String(v??"").replace(/[^0-9.-]/g,""));return Number.isFinite(n)?n:0}
+function freightTotal(r){return [r.base_fare,r.waiting_fee,r.inspection_fee,r.loading_fee,r.stopover_fee,r.night_fee,r.other_fee].reduce((a,v)=>a+freightNum(v),0)}
+async function loadFreightOrders(){
+  if(!supabaseClient||!state.user||!canManageFreight()){state.freightOrders=[];return}
+  const {data,error}=await supabaseClient.from("freight_orders").select("*").order("ship_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000);
+  if(error){console.warn("운송비 자료 조회 실패",error);state.freightOrders=[];return}
+  state.freightOrders=data||[];
+}
+function parseFreightMessage(text){
+  const raw=String(text||"").replace(/\r/g,"").trim(); if(!raw)return [];
+  const lines=raw.split("\n").map(x=>x.trim()).filter(Boolean);
+  let baseDate=null, category=/수출/.test(lines[0]||"")?"수출":"국내";
+  const dm=(lines[0]||"").match(/(\d{1,2})\/(\d{1,2})/); if(dm){const y=new Date().getFullYear();baseDate=`${y}-${String(dm[1]).padStart(2,"0")}-${String(dm[2]).padStart(2,"0")}`}
+  const groups=[]; let cur=null;
+  for(const line of lines.slice(1)){
+    if(!line.startsWith("*") && line.includes("/") && /\d+\s*(plt|pl|pallet|파렛트)/i.test(line)){
+      if(cur)groups.push(cur); const parts=line.split("/").map(x=>x.trim());
+      const plt=(line.match(/(\d+(?:\.\d+)?)\s*(?:plt|pl|pallet|파렛트)/i)||[])[1];
+      cur={ship_date:baseDate,category,customer:parts[0]||"",address:parts.slice(1,-1).join(" / "),pallets:freightNum(plt),notes:"",order_numbers:"",status:"등록",base_fare:0,waiting_fee:0,inspection_fee:0,loading_fee:0,stopover_fee:0,night_fee:0,other_fee:0};
+    }else if(cur){
+      const code=(line.match(/\b(?:SB|DS)\d{8,}\b/gi)||[]); if(code.length)cur.order_numbers=[cur.order_numbers,...code].filter(Boolean).join(", ");
+      else cur.notes=[cur.notes,line.replace(/^\*/,"")].filter(Boolean).join(" / ");
+      const dates=line.match(/(\d{1,2})[.\/-](\d{1,2})/g)||[]; if(dates[0]){const [m,d]=dates[0].split(/[.\/-]/);cur.ship_date=`${new Date().getFullYear()}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`};
+      if(dates[1]){const [m,d]=dates[1].split(/[.\/-]/);cur.arrival_date=`${new Date().getFullYear()}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`};
+    }
+  }
+  if(cur)groups.push(cur); return groups;
+}
+function recommendFreightPrice(d){
+  const province=(String(d.address||"").match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/)||[])[1]||"";
+  let rows=(state.freightOrders||[]).filter(x=>province&&String(x.address||"").includes(province));
+  if(d.customer)rows=rows.filter(x=>String(x.customer||"").includes(d.customer)||String(d.customer).includes(String(x.customer||""))).concat(rows).slice(0,20);
+  rows=rows.filter(x=>freightTotal(x)>0); if(!rows.length)return {amount:0,basis:"유사 과거자료 없음"};
+  const vals=rows.map(freightTotal).sort((a,b)=>a-b); const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length/1000)*1000;
+  return {amount:avg,basis:`유사 운송 ${vals.length}건 평균 (${Math.min(...vals).toLocaleString()}~${Math.max(...vals).toLocaleString()}원)`};
+}
+function analyzeFreightText(){
+  state.freightDrafts=parseFreightMessage($("freightKakaoInput")?.value||"");
+  state.freightDrafts.forEach(x=>{const r=recommendFreightPrice(x);x.ai_estimate=r.amount;x.ai_basis=r.basis;if(!x.base_fare)x.base_fare=r.amount});
+  renderFreightDrafts(); toast(`${state.freightDrafts.length}건을 분석했습니다.`);
+}
+function freightDraftInput(i,key,val){if(!state.freightDrafts[i])return;state.freightDrafts[i][key]=["pallets","base_fare","waiting_fee","inspection_fee","loading_fee","stopover_fee","night_fee","other_fee"].includes(key)?freightNum(val):val;renderFreightDraftTotal(i)}
+function renderFreightDraftTotal(i){const el=$(`freightDraftTotal${i}`);if(el)el.textContent=money(freightTotal(state.freightDrafts[i]||{}))}
+function renderFreightDrafts(){
+  const box=$("freightDraftTable");if(!box)return; const rows=state.freightDrafts||[];
+  box.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>출고일</th><th>구분</th><th>거래처</th><th>주소</th><th>PT</th><th>주문번호</th><th>기본운임</th><th>대기료</th><th>검수비</th><th>상하차비</th><th>기타</th><th>합계</th><th>추천근거</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td><input type="date" value="${escapeHtml(r.ship_date||"")}" onchange="freightDraftInput(${i},'ship_date',this.value)"></td><td><select onchange="freightDraftInput(${i},'category',this.value)"><option ${r.category==='수출'?'selected':''}>수출</option><option ${r.category==='국내'?'selected':''}>국내</option></select></td><td><input value="${escapeHtml(r.customer||"")}" onchange="freightDraftInput(${i},'customer',this.value)"></td><td><input class="wide-input" value="${escapeHtml(r.address||"")}" onchange="freightDraftInput(${i},'address',this.value)"></td><td><input type="number" value="${r.pallets||0}" onchange="freightDraftInput(${i},'pallets',this.value)"></td><td><input value="${escapeHtml(r.order_numbers||"")}" onchange="freightDraftInput(${i},'order_numbers',this.value)"></td>${['base_fare','waiting_fee','inspection_fee','loading_fee','other_fee'].map(k=>`<td><input type="number" value="${freightNum(r[k])}" onchange="freightDraftInput(${i},'${k}',this.value)"></td>`).join('')}<td><b id="freightDraftTotal${i}">${money(freightTotal(r))}</b></td><td><small>${escapeHtml(r.ai_basis||'')}</small></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">카카오톡 내용을 붙여넣고 AI 자동 분석을 누르세요.</div>`;
+}
+async function saveFreightDrafts(){
+  if(!state.freightDrafts.length){toast("저장할 운송 건이 없습니다.");return}
+  const rows=state.freightDrafts.map(r=>({...r,total_amount:freightTotal(r),created_by:state.user.id,created_by_name:state.profile?.name||"",updated_at:new Date().toISOString()}));
+  const {error}=await supabaseClient.from("freight_orders").insert(rows);if(error){toast("운송비 저장 실패: "+error.message);return}
+  state.freightDrafts=[];$("freightKakaoInput").value="";await loadFreightOrders();renderFreight();toast("운송자료를 저장했습니다.");
+}
+async function deleteFreightOrder(id){if(!isPortalOwner()){toast("삭제는 손동오 계정에서만 가능합니다.");return}if(!(await appConfirm("이 운송 건을 삭제할까요?",{danger:true})))return;const {error}=await supabaseClient.from("freight_orders").delete().eq("id",id);if(error){toast(error.message);return}await loadFreightOrders();renderFreight();}
+function renderFreight(){
+  const list=$("freightOrderList");if(!list)return;renderFreightDrafts();
+  const rows=state.freightOrders||[];const total=rows.reduce((a,r)=>a+freightTotal(r),0),waiting=rows.reduce((a,r)=>a+freightNum(r.waiting_fee),0),inspection=rows.reduce((a,r)=>a+freightNum(r.inspection_fee),0);
+  $("freightKpiCount").textContent=rows.length.toLocaleString();$("freightKpiTotal").textContent=money(total);$("freightKpiWaiting").textContent=money(waiting);$("freightKpiInspection").textContent=money(inspection);
+  list.innerHTML=rows.length?tableHtml(["출고일","구분","거래처","주소","PT","주문번호","기본운임","대기료","검수비","상하차비","기타","합계","상태",...(isPortalOwner()?["관리"]:[])],rows.map(r=>[r.ship_date||"",r.category||"",r.customer||"",r.address||"",r.pallets||0,r.order_numbers||"",money(r.base_fare),money(r.waiting_fee),money(r.inspection_fee),money(r.loading_fee),money(r.other_fee),money(freightTotal(r)),r.status||"등록",...(isPortalOwner()?[`<button class="btn small danger" onclick="deleteFreightOrder('${r.id}')">삭제</button>`]:[])])):`<div class="empty">등록된 운송자료가 없습니다.</div>`;
+}
+function freightRowsForExcel(){return (state.freightOrders||[]).map(r=>({출고일:r.ship_date,입고일:r.arrival_date,구분:r.category,거래처:r.customer,주소:r.address,파렛트:r.pallets,주문번호:r.order_numbers,기본운임:freightNum(r.base_fare),대기료:freightNum(r.waiting_fee),검수비:freightNum(r.inspection_fee),상하차비:freightNum(r.loading_fee),경유비:freightNum(r.stopover_fee),야간휴일할증:freightNum(r.night_fee),기타비용:freightNum(r.other_fee),최종운송비:freightTotal(r),상태:r.status,특이사항:r.notes,입력자:r.created_by_name}));}
+function renderIntegratedReport(){if(!$("integratedReportPage"))return;const ok=isPortalOwner();$("integratedReportLocked").classList.toggle("hidden",ok);$("integratedReportContent").classList.toggle("hidden",!ok);if(!ok)return;const freight=(state.freightOrders||[]).reduce((a,r)=>a+freightTotal(r),0);$("reportFreightTotal").textContent=money(freight);$("reportCsCount").textContent=(state.privateMessages||[]).length.toLocaleString()+"건";$("reportPurchaseCount").textContent=(state.purchaseRequests||[]).length.toLocaleString()+"건";$("reportEmployeeCount").textContent=(state.employees||[]).filter(x=>x.is_active!==false).length.toLocaleString()+"명";}
+async function exportIntegratedReport(){
+  if(!isPortalOwner()){toast("손동오 이사 계정에서만 다운로드할 수 있습니다.");return}if(!window.XLSX){toast("엑셀 모듈을 불러오지 못했습니다.");return}
+  await loadFreightOrders(); const wb=XLSX.utils.book_new();
+  const f=freightRowsForExcel(), freightTotalValue=f.reduce((a,r)=>a+Number(r.최종운송비||0),0);
+  const summary=[{"구분":"생성일시","값":new Date().toLocaleString("ko-KR")},{"구분":"운송 건수","값":f.length},{"구분":"운송비 합계","값":freightTotalValue},{"구분":"구매요청 건수","값":state.purchaseRequests.length},{"구분":"재직 인원","값":state.employees.filter(x=>x.is_active!==false).length},{"구분":"법인카드 등록 건수","값":state.cards.length},{"구분":"외주근무 등록 건수","값":state.contractorWorkforce.length}];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(summary),"01 경영요약");
+  XLSX.utils.book_append_sheet(wb,f.length?XLSX.utils.json_to_sheet(f):XLSX.utils.aoa_to_sheet([["자료 없음"]]),"02 운송비 상세");
+  const month={};f.forEach(r=>{const m=String(r.출고일||"").slice(0,7)||"미지정";month[m]=(month[m]||0)+Number(r.최종운송비||0)});XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.entries(month).map(([월,운송비])=>({월,운송비}))),"03 운송비 월별요약");
+  const append=(name,rows)=>XLSX.utils.book_append_sheet(wb,rows.length?XLSX.utils.json_to_sheet(rows):XLSX.utils.aoa_to_sheet([["자료 없음"]]),name.slice(0,31));
+  append("04 법인카드",state.cards);append("05 물품재고",state.items);append("06 구매요청",state.purchaseRequests);append("07 근무휴무",state.calendarEntries);append("08 외주인력",state.contractorWorkforce);append("09 차량",state.vehicles);append("10 차량운행",state.vehicleTrips);append("11 차량정비",state.vehicleMaintenance);append("12 출장",state.businessTrips);append("13 회사일정",state.companyEvents);append("14 직원",state.employees);
+  const stamp=new Date().toISOString().slice(0,10).replace(/-/g,"");XLSX.writeFile(wb,`서린컴퍼니_물류본부_통합보고서_${stamp}.xlsx`);
+}
+window.freightDraftInput=freightDraftInput;window.deleteFreightOrder=deleteFreightOrder;
 function isScheduleAdmin(){
   const name=String(state.profile?.name||"").trim();
   return name==="김헌정" || name==="손동오";
@@ -3627,6 +3715,8 @@ function getAllManagedEmployees(){
   return rows.sort((a,b)=>(Number(a.sort_order||999)-Number(b.sort_order||999))||String(a.team||"").localeCompare(String(b.team||""))||String(a.name||"").localeCompare(String(b.name||"")));
 }
 function renderEmployees(){
+  const oldWrap=$("employeeTable")?.querySelector(".table-wrap");
+  const savedTop=oldWrap?.scrollTop||0, savedLeft=oldWrap?.scrollLeft||0;
   const all=getAllManagedEmployees();
   const rows=all.map(x=>{
     const s=x.id?employeeLeaveStats(x.id):{annualBalance:Number(x.annual_leave_granted||0),compBalance:0};
@@ -3637,7 +3727,10 @@ function renderEmployees(){
     ];
   });
   const box=$("employeeTable");
-  if(box)box.innerHTML=tableHtml(["수정","직원번호","이름","부서","팀","업무구분","근무지","고용형태","직급","연차잔여","대휴잔여","계정","상태"],rows);
+  if(box){
+    box.innerHTML=tableHtml(["수정","직원번호","이름","부서","팀","업무구분","근무지","고용형태","직급","연차잔여","대휴잔여","계정","상태"],rows);
+    requestAnimationFrame(()=>{const wrap=box.querySelector(".table-wrap");if(wrap){wrap.scrollTop=savedTop;wrap.scrollLeft=savedLeft;}});
+  }
 }
 function tableHtml(head,rows){
   const cell=value=>{
@@ -3647,6 +3740,7 @@ function tableHtml(head,rows){
   return `<div class="table-wrap"><table><thead><tr>${head.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(c=>`<td>${cell(c)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${head.length}">등록된 내용이 없습니다.</td></tr>`}</tbody></table></div>`;
 }
 window.selectEmployeeByEmpNo=function(empNo){
+  const pageY=window.scrollY; const listWrap=$("employeeTable")?.querySelector(".table-wrap"); const listTop=listWrap?.scrollTop||0;
   const e=getAllManagedEmployees().find(x=>String(x.emp_no)===String(empNo));
   if(!e)return;
   showEmployeeMode("edit");
@@ -3667,6 +3761,7 @@ window.selectEmployeeByEmpNo=function(empNo){
   document.querySelectorAll(".joined-only-field").forEach(el=>el.classList.toggle("hidden",!!e.registry_only));
   updateEmployeeLeavePreview();
   renderEmployeeLeaveHistory();
+  requestAnimationFrame(()=>{window.scrollTo({top:pageY,behavior:"auto"});if(listWrap)listWrap.scrollTop=listTop;});
 }
 window.selectEmployee=function(id){
   const e=state.employees.find(x=>x.id===id);if(e)selectEmployeeByEmpNo(e.emp_no);
@@ -3732,7 +3827,7 @@ async function saveLeaveBalances(){
       p_reason:reason
     });
     if(error){
-      const message="연차·대휴 저장 실패: "+error.message+"\n\nSupabase에서 V44 SQL을 먼저 실행했는지 확인하세요.";
+      const message="연차·대휴 저장 실패: "+error.message+"\n\nSupabase에서 V126 SQL을 먼저 실행했는지 확인하세요.";
       toast(message);
       alert(message);
       return;
@@ -3766,7 +3861,7 @@ async function quickLeaveAdjustment(type,delta){
     p_reason:reason
   });
   if(error){
-    const message="연차·대휴 수정 실패: "+error.message+"\n\nSupabase에서 V44 SQL을 먼저 실행했는지 확인하세요.";
+    const message="연차·대휴 수정 실패: "+error.message+"\n\nSupabase에서 V126 SQL을 먼저 실행했는지 확인하세요.";
     toast(message);alert(message);return;
   }
   await Promise.all([loadLeaveAdjustments(),loadYearlyLeaveBalances()]);
@@ -4932,3 +5027,6 @@ window.addEventListener('beforeunload',()=>{try{state.dinnerPresenceChannel?.unt
     }
   });
 })();
+
+// V126 운송비·통합보고서
+bindClick("analyzeFreightBtn",analyzeFreightText);bindClick("saveFreightDraftsBtn",saveFreightDrafts);bindClick("refreshFreightBtn",async()=>{await loadFreightOrders();renderFreight();toast("운송자료를 새로고침했습니다.")});bindClick("exportIntegratedReportBtn",exportIntegratedReport);

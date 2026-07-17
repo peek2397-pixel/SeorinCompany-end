@@ -1087,3 +1087,11 @@ body:not(.modal-open)>.busy-layer{pointer-events:none!important}
 .inventory-use-form .span-2{grid-column:1/-1}
 .inventory-use-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 @media(max-width:700px){.inventory-detail-grid,.inventory-use-form{grid-template-columns:1fr}.inventory-use-form .span-2{grid-column:auto}}
+
+/* V126 운송비 및 직원목록 안정화 */
+.freight-kakao-input{width:100%;min-height:220px;resize:vertical;line-height:1.6;margin:10px 0 12px}
+#freightDraftTable{margin-top:14px}#freightDraftTable table{min-width:1900px}#freightDraftTable input,#freightDraftTable select{min-width:105px;padding:7px}.wide-input{min-width:320px!important}
+.freight-kpis{margin-bottom:15px}.report-download-panel{display:flex;align-items:center;justify-content:space-between;gap:24px}.btn.large{padding:14px 22px;font-size:16px}
+#employeeTable .table-wrap{scroll-behavior:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.employee-list-panel{contain:layout paint}
+@media(max-width:900px){.report-download-panel{align-items:stretch;flex-direction:column}}

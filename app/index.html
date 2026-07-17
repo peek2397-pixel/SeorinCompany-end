@@ -955,6 +955,16 @@
           </article>
         </div>
       </section>
+
+<section id="freightPage" class="page">
+  <div class="kpi-grid freight-kpis"><div class="kpi-card"><span>등록 건수</span><b id="freightKpiCount">0</b></div><div class="kpi-card"><span>최종 운송비</span><b id="freightKpiTotal">0원</b></div><div class="kpi-card"><span>대기료</span><b id="freightKpiWaiting">0원</b></div><div class="kpi-card"><span>검수비</span><b id="freightKpiInspection">0원</b></div></div>
+  <article class="panel"><div class="panel-head"><div><h3>카카오톡 운송지시 자동입력</h3><small class="muted-text">내용을 통째로 붙여넣으면 거래처·주소·PT·주문번호를 여러 건으로 나눕니다. 추천 단가는 과거 확정자료의 유사 평균이며 저장 전에 직접 수정할 수 있습니다.</small></div><button id="refreshFreightBtn" class="btn">새로고침</button></div><textarea id="freightKakaoInput" class="freight-kakao-input" placeholder="예: 7/20 월요일 수출&#10;&#10;미국 / 부산광역시 ... / 8plt&#10;*07.20출고 → 07.21입고&#10;*SB202607140002"></textarea><div class="actions"><button id="analyzeFreightBtn" class="btn primary">AI 자동 분석</button><button id="saveFreightDraftsBtn" class="btn">전체 저장</button></div><div id="freightDraftTable"></div></article>
+  <article class="panel"><div class="panel-head"><h3>운송비 내역</h3><span class="badge">기본운임 + 대기료 + 검수비 + 부대비용</span></div><div id="freightOrderList"></div></article>
+</section>
+<section id="integratedReportPage" class="page">
+  <div id="integratedReportLocked" class="panel hidden"><div class="empty">이 화면은 손동오 이사 계정에서만 볼 수 있습니다.</div></div>
+  <div id="integratedReportContent" class="hidden"><div class="kpi-grid"><div class="kpi-card"><span>누적 운송비</span><b id="reportFreightTotal">0원</b></div><div class="kpi-card"><span>소통·CS 자료</span><b id="reportCsCount">0건</b></div><div class="kpi-card"><span>구매요청</span><b id="reportPurchaseCount">0건</b></div><div class="kpi-card"><span>재직 인원</span><b id="reportEmployeeCount">0명</b></div></div><article class="panel report-download-panel"><div><h3>물류본부 통합보고서</h3><p>운송비, 법인카드, 물품재고, 구매, 근무·휴무, 외주인력, 차량, 출장, 회사 일정, 직원자료를 하나의 엑셀로 생성합니다.</p><small>홈페이지에 저장된 최신 Supabase 자료를 기준으로 다운로드 시점에 자동 생성됩니다.</small></div><button id="exportIntegratedReportBtn" class="btn primary large">통합보고서 엑셀 다운로드</button></article></div>
+</section>
 <section id="employeesPage" class="page">
         <div class="employee-manage-layout">
           <article class="panel employee-list-panel">
